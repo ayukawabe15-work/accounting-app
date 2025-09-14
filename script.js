@@ -55,12 +55,11 @@ window.gisLoaded = () => {
   gisInited = true;
   maybeEnableLogin();
 };
-async function ensureGapiReady() {
-  if (gapiInited) return;
-  await new Promise((resolve) => gapi.load("client", resolve));
-  await gapi.client.init({});
-  await gapi.client.load("drive", "v3");
-  gapiInited = true;
+function maybeEnableLogin() {
+  if (gisInited && loginBtn) {
+    loginBtn.disabled = false;
+    loginBtn.classList.remove("is-disabled");
+  }
 }
 async function ensureGapiReady() {
   if (gapiInited) return;
@@ -320,4 +319,5 @@ form?.addEventListener("submit", async (e) => {
   const dd = String(d.getDate()).padStart(2, "0");
   if (dateEl) dateEl.value = `${yyyy}-${mm}-${dd}`;
 })();
+
 
