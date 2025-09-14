@@ -17,7 +17,7 @@ h1{font-family:"Poppins",sans-serif;font-weight:700;letter-spacing:.3px}
 
 /* Buttons */
 .btn{appearance:none;border:0;cursor:pointer;padding:.52rem .85rem;border-radius:12px;background:#ffe5f0;color:#b73a6e;
-  font-weight:700;border:1px solid var(--line);box-shadow:0 2px 0 rgba(0,0,0,.04);transition:.18s ease;font-size:.93rem}
+  font-weight:700;border:1px solid var(--line);box-shadow:0 2px 0 rgba(0,0,0,.04);transition:.18s ease;font-size:.93rem;white-space:nowrap}
 .btn:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(0,0,0,.08)}
 .btn-primary{background:linear-gradient(180deg,var(--accent),#ff4f96);color:#fff;border:0;box-shadow:0 8px 18px rgba(255,105,164,.3)}
 .btn-danger{background:linear-gradient(180deg,var(--danger),#ff5969);color:#fff;border:0;box-shadow:0 8px 18px rgba(255,91,105,.28)}
@@ -37,42 +37,22 @@ h1{font-family:"Poppins",sans-serif;font-weight:700;letter-spacing:.3px}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
 .grid.compact{gap:.75rem}
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem}
-.grid-form {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-.grid-form .wide {
-  grid-column: span 4;
-}
-#autoRateBtn {
-  white-space: nowrap;
-  padding: 6px 12px;
-  font-size: 0.9rem;
-}
-.cell{display:flex;flex-direction:column;gap:.35rem}
+
+/* コンパクトなフォーム 4列グリッド */
+.grid-form{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem}
+.grid-form .wide{grid-column:span 4}
 .col-2{grid-column:span 2}
-.col-2-md{grid-column:span 2}
-@media (max-width:1100px){.grid,.grid-3{grid-template-columns:repeat(2,1fr)}.col-2-md{grid-column:span 2}}
-@media (max-width:640px){.grid,.grid-3{grid-template-columns:1fr}.col-2,.col-2-md{grid-column:span 1}}
+@media (max-width:1100px){.grid,.grid-3,.grid-form{grid-template-columns:repeat(2,1fr)}.col-2{grid-column:span 2}}
+@media (max-width:640px){.grid,.grid-3,.grid-form{grid-template-columns:1fr}.col-2{grid-column:span 1}}
 
 /* Inputs */
-label>span{font-size:.88rem;color:#7a6572}
+label>span{display:block;font-size:.88rem;color:#7a6572;margin-bottom:.2rem}
 input,select{width:100%;padding:.6rem .7rem;background:#fff;border:1.5px solid var(--line);border-radius:12px;color:var(--text);transition:.15s ease;font-size:.95rem}
 input::placeholder{color:#b89aa9}
 input:focus,select:focus{outline:none;border-color:#ffb4d0;background:#fff;box-shadow:0 0 0 3px #ffe3ef,0 8px 16px rgba(255,143,189,.15)}
 input[type="file"]{padding:.45rem .6rem;background:var(--panel-2)}
-.combo-input{display:flex;gap:.5rem}
-.combo-input select,.combo-input input{flex:1}
-.row{display:flex;gap:.5rem;align-items:center}
-.row.nowrap{flex-wrap:nowrap}
-.actions{display:flex;gap:.6rem;margin-top:.2rem}
-
-/* helper text under field */
+.combo-input{display:flex;gap:.5rem;align-items:center}
 .helper{margin:.25rem 0 0;color:#a18697;font-size:.8rem}
-
-/* sticky submit bar (小さく) */
-.sticky-actions{position:sticky;bottom:.5rem;display:flex;justify-content:flex-start;gap:.6rem;background:transparent}
 
 /* Filters */
 .filters{display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end}
@@ -101,6 +81,5 @@ input[type="file"]{padding:.45rem .6rem;background:var(--panel-2)}
 /* Login chip */
 #loginStatus{margin-left:.55rem;padding:.2rem .55rem;border-radius:999px;background:#fff;border:1px solid var(--line);color:#b73a6e;font-weight:700}
 
-.hidden {
-  display: none;
-}
+/* 他 */
+.hidden{display:none}
