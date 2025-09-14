@@ -26,7 +26,6 @@ async function gapiLoaded() {
     });
     gapiReady = true;
     setReady();
-    console.log("[APP] gapi client ready");
   } catch (e) {
     console.error("[APP] gapi init failed", e);
   }
@@ -45,32 +44,29 @@ function gisLoaded() {
     });
     gisReady = true;
     setReady();
-    console.log("[APP] tokenClient initialized");
   } catch (e) {
     console.error("[APP] gis init failed", e);
   }
 }
 
-// 3) クリック時（準備できていないときは分かりやすく通知）
+// 3) クリック時
 if (loginBtn) {
   loginBtn.onclick = () => {
     if (!tokenClient) {
       alert("まだ準備中です。数秒後に再度お試しください。");
-      console.warn("[APP] tokenClient is not ready yet");
       return;
     }
     tokenClient.requestAccessToken();
   };
 }
 
-// 4) ページ読み込み後、外部SDKの読み込み完了を待つ（index.htmlでonload属性が無くても動く）
+// SDKの読み込み完了待ち（index.html側の順序に依存しない）
 window.addEventListener("load", async () => {
   await waitFor(() => window.gapi && typeof gapi.load === "function");
   await gapiLoaded();
   await waitFor(() => window.google && google.accounts && google.accounts.oauth2);
   gisLoaded();
 });
-
 function waitFor(cond, timeoutMs = 10000, intervalMs = 100) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
@@ -97,29 +93,93 @@ let records = loadRecords();
 function loadRecords(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }catch{ return []; } }
 function saveRecords(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); }
 
+/***** 多通貨：UI要素とロジック *****/
+const currencyEl = document.getElementById("currency");
+const amountFxEl = document.getElementById("amountFx");
+const fxRateEl   = document.getElementById("fxRate");
+const autoRateBtn = document.getElementById("autoRateBtn");
+const amountJpyEl = document.getElementById("amount");
+
+// 通貨がJPYなら外貨項目をクリア＆無視、JPY以外なら自動で円換算
+currencyEl.addEventListener("change", () => {
+  if (currencyEl.value === "JPY") {
+    amountFxEl.value = "";
+    fxRateEl.value = "";
+  }
+  recalcJPY();
+});
+[amountFxEl, fxRateEl].forEach(el => el.addEventListener("input", recalcJPY));
+amountJpyEl.addEventListener("input", () => {
+  // 手動でJPYを直したいケースも許容（外貨入力が空でもOK）
+});
+
+function recalcJPY(){
+  if (currencyEl.value === "JPY") return; // そのままJPY直接入力
+  const fx = parseFloat(amountFxEl.value || "0");
+  const rate = parseFloat(fxRateEl.value || "0");
+  if (fx>0 && rate>0){
+    amountJpyEl.value = Math.round(fx * rate);
+  }
+}
+
+// 為替自動取得（exchangerate.host：無料・キー不要）
+autoRateBtn.addEventListener("click", async () => {
+  const ccy = currencyEl.value;
+  if (ccy === "JPY") {
+    alert("通貨がJPYのため為替は不要です。");
+    return;
+  }
+  const date = document.getElementById("date").value || new Date().toISOString().slice(0,10);
+  try{
+    // 例: https://api.exchangerate.host/convert?from=USD&to=JPY&date=2025-09-14
+    const url = `https://api.exchangerate.host/convert?from=${encodeURIComponent(ccy)}&to=JPY&date=${date}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data || typeof data.result !== "number") throw new Error("rate not found");
+    fxRateEl.value = data.result.toFixed(6);
+    recalcJPY();
+  }catch(e){
+    console.error(e);
+    alert("為替レートの自動取得に失敗しました。レートを手入力してください。");
+  }
+});
+
 /***** 入力フォーム処理（Driveアップロード→登録） *****/
 const form = document.getElementById("entryForm");
 const tableBody = document.querySelector("#recordsTable tbody");
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
+
   const date = document.getElementById("date").value;
   const category = document.getElementById("category").value;
   const customCategory = document.getElementById("customCategory").value.trim();
   const method = document.getElementById("method").value;
-  const amount = Number(document.getElementById("amount").value || 0);
+
+  const currency = currencyEl.value || "JPY";
+  const amountFx = parseFloat(amountFxEl.value || "0");
+  const fxRate   = parseFloat(fxRateEl.value || "0");
+  const amountJPY = parseInt(document.getElementById("amount").value || "0", 10);
+
   const memo = document.getElementById("memo").value.trim();
   const fileInput = document.getElementById("fileInput");
 
-  if(!date || !amount){ alert("日付と金額は必須です"); return; }
-  const finalCategory = customCategory || category;
+  // 入力チェック
+  if(!date){ alert("日付は必須です"); return; }
+  if(currency === "JPY"){
+    if(!amountJPY){ alert("金額（円）は必須です"); return; }
+  }else{
+    if(!amountFx || !fxRate){ alert("外貨金額とレートを入力してください（自動取得も可）"); return; }
+  }
+
+  const finalCategory = (customCategory || category);
   const type = (finalCategory.includes("収益") ? "収入" : "経費");
 
+  // ファイルアップロード
   let fileName = "", fileUrl = "";
   if(fileInput.files.length>0){
     const file = fileInput.files[0];
     try{
-      // Driveアップロード
       const accessToken = gapi.client.getToken()?.access_token;
       if(!accessToken){ alert("先に『Googleにログイン』してください"); return; }
 
@@ -136,8 +196,6 @@ form.addEventListener("submit", async (e) => {
       const data = await res.json();
       if(!data.id) throw new Error("Google Driveへのアップロードに失敗");
       const fileId = data.id;
-
-      // 共有リンク（閲覧用URL）
       fileUrl = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
       fileName = file.name;
     }catch(err){
@@ -147,7 +205,20 @@ form.addEventListener("submit", async (e) => {
     }
   }
 
-  const rec = { id: crypto.randomUUID(), date, category: finalCategory, type, amount, method, memo, fileName, fileUrl };
+  const rec = {
+    id: crypto.randomUUID(),
+    date,
+    category: finalCategory,
+    type,
+    // 保持はJPYと外貨の両方
+    amount: amountJPY,        // 集計用（JPY）
+    currency,                 // 通貨
+    amountFx: (currency==="JPY" ? 0 : amountFx),
+    fxRate:  (currency==="JPY" ? 1 : fxRate),
+    method,
+    memo,
+    fileName, fileUrl
+  };
   records.push(rec);
   saveRecords();
   form.reset();
@@ -187,12 +258,17 @@ function renderTable(){
   const rows = records.filter(passesFilters).sort((a,b)=>a.date.localeCompare(b.date));
   for(const r of rows){
     const tr = document.createElement("tr");
+    // 外貨表示（JPY以外なら "USD 25.99 @ 151.23" など）
+    const fxCell = (r.currency && r.currency!=="JPY")
+      ? `${r.currency} ${Number(r.amountFx).toLocaleString(undefined,{maximumFractionDigits:4})} @ ${Number(r.fxRate).toLocaleString(undefined,{maximumFractionDigits:6})}`
+      : "";
     const linkHtml = r.fileUrl ? `<a href="${r.fileUrl}" target="_blank" data-preview="${r.fileUrl}" data-name="${r.fileName}" class="preview-link">${r.fileName||"開く"}</a>` : "";
     tr.innerHTML = `
       <td>${r.date}</td>
       <td>${r.category}</td>
       <td>${r.type}</td>
-      <td>${r.amount.toLocaleString()}</td>
+      <td>${Number(r.amount||0).toLocaleString()}</td>
+      <td>${fxCell}</td>
       <td>${r.method||""}</td>
       <td>${r.memo||""}</td>
       <td>${linkHtml}</td>
@@ -205,10 +281,12 @@ function renderTable(){
 /***** CSVエクスポート *****/
 document.getElementById("exportCSV").onclick = ()=>{
   const rows = records.filter(passesFilters).sort((a,b)=>a.date.localeCompare(b.date));
-  const header = ["ID","日付","使い道","区分","金額","支払方法","メモ","ファイル名","ファイルURL"];
+  const header = ["ID","日付","使い道","区分","金額JPY","通貨","外貨金額","為替レート","支払方法","メモ","ファイル名","ファイルURL"];
   const csv = [header.join(",")].concat(
     rows.map(r=>[
-      r.id, r.date, esc(r.category), r.type, r.amount, esc(r.method||""), esc(r.memo||""), esc(r.fileName||""), r.fileUrl||""
+      r.id, r.date, esc(r.category), r.type, r.amount,
+      r.currency||"JPY", r.amountFx||0, r.fxRate||1,
+      esc(r.method||""), esc(r.memo||""), esc(r.fileName||""), r.fileUrl||""
     ].join(","))
   ).join("\r\n");
 
@@ -230,7 +308,7 @@ function calcAggregates(){
   const ym = aggMonth.value; // "YYYY-MM" or ""
   const year = aggYear.value ? String(aggYear.value) : "";
 
-  // 月次
+  // 月次（JPY金額で集計）
   if(ym){
     const monthRecs = records.filter(r=>r.date?.startsWith(ym));
     const mIncome = sumByType(monthRecs,"収入");
@@ -276,8 +354,7 @@ function setText(id,txt){ document.getElementById(id).innerText = txt; }
 function bindPreviewLinks(){
   document.querySelectorAll("a.preview-link").forEach(a=>{
     a.addEventListener("click",(e)=>{
-      // Ctrl/⌘クリックや中クリックは新規タブを優先
-      if(e.ctrlKey || e.metaKey || e.button===1) return;
+      if(e.ctrlKey || e.metaKey || e.button===1) return; // 新規タブ優先
       e.preventDefault();
       openPreview(a.dataset.preview, a.dataset.name);
     });
