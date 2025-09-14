@@ -35,4 +35,138 @@
             <option>サーバー代</option>
             <option>電子機器</option>
             <option>雑費</option>
-            <option>収
+            <option>収益(FANBOX等)</option>
+            <option>その他</option>
+          </select>
+          <input type="text" id="customCategory" placeholder="その他の内容（任意）" />
+        </label>
+
+        <label>支払方法
+          <select id="method">
+            <option>未選択</option>
+            <option>PayPal</option>
+            <option>PayPay</option>
+            <option>銀行振込</option>
+            <option>クレカ</option>
+            <option>現金</option>
+            <option>その他</option>
+          </select>
+        </label>
+
+        <label>金額（円）
+          <input type="number" id="amount" min="0" step="1" required />
+        </label>
+
+        <label>メモ
+          <input type="text" id="memo" placeholder="例：MLO/車MOD/サーバー更新など" />
+        </label>
+
+        <label>ファイル添付（画像/PDF）
+          <input type="file" id="fileInput" accept="image/*,.pdf" />
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="submit">保存（Driveへ自動アップロード）</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 一覧タブ -->
+  <section id="tab-list" class="tab-panel">
+    <div class="card">
+      <div class="filters">
+        <input type="month" id="filterMonth" />
+        <select id="filterCategory">
+          <option value="">すべての使い道</option>
+          <option>スクリプト購入</option>
+          <option>サーバー代</option>
+          <option>電子機器</option>
+          <option>雑費</option>
+          <option>収益(FANBOX等)</option>
+          <option>その他</option>
+        </select>
+        <select id="filterMethod">
+          <option value="">すべての支払方法</option>
+          <option>未選択</option>
+          <option>PayPal</option>
+          <option>PayPay</option>
+          <option>銀行振込</option>
+          <option>クレカ</option>
+          <option>現金</option>
+          <option>その他</option>
+        </select>
+        <input type="text" id="filterText" placeholder="メモ/使い道を検索…" />
+        <button id="clearFilters">フィルター解除</button>
+        <div class="spacer"></div>
+        <button id="exportCSV">CSVエクスポート</button>
+      </div>
+
+      <div class="table-wrap">
+        <table id="recordsTable">
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>使い道</th>
+              <th>区分</th>
+              <th>金額</th>
+              <th>支払方法</th>
+              <th>メモ</th>
+              <th>添付</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 集計タブ -->
+  <section id="tab-aggregate" class="tab-panel">
+    <div class="card">
+      <div class="filters">
+        <input type="month" id="aggMonth" />
+        <input type="number" id="aggYear" min="2000" max="2100" placeholder="年（例 2025）" />
+        <button id="recalc">再計算</button>
+      </div>
+
+      <h3>月次集計（選択した月）</h3>
+      <div class="grid-3">
+        <div class="kpi"><div class="kpi-label">収入合計</div><div id="mIncome" class="kpi-value">-</div></div>
+        <div class="kpi"><div class="kpi-label">経費合計</div><div id="mExpense" class="kpi-value">-</div></div>
+        <div class="kpi"><div class="kpi-label">月間損益</div><div id="mNet" class="kpi-value">-</div></div>
+      </div>
+
+      <h3>年次集計（選択した年）</h3>
+      <div class="grid-3">
+        <div class="kpi"><div class="kpi-label">収入合計</div><div id="yIncome" class="kpi-value">-</div></div>
+        <div class="kpi"><div class="kpi-label">経費合計</div><div id="yExpense" class="kpi-value">-</div></div>
+        <div class="kpi"><div class="kpi-label">年間損益</div><div id="yNet" class="kpi-value">-</div></div>
+      </div>
+
+      <h4>月別サマリー（年選択に基づく）</h4>
+      <div class="table-wrap">
+        <table id="monthlySummary">
+          <thead>
+            <tr>
+              <th>月</th><th>収入</th><th>経費</th><th>損益</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 画像/PDFプレビュー（モーダル） -->
+  <dialog id="previewModal">
+    <button id="closePreview" class="close">&times;</button>
+    <div id="previewContainer"></div>
+  </dialog>
+
+  <!-- Google API -->
+  <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+  <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+  <script src="script.js"></script>
+</body>
+</html>
