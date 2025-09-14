@@ -25,96 +25,117 @@
   <!-- 入力（2～3行に収まるコンパクト版） -->
   <section id="tab-input" class="tab-panel active">
     <form id="entryForm" class="grid-form">
-  <!-- 1行目 -->
-  <div>
-    <label>日付
-      <input type="date" id="date" required>
-    </label>
-  </div>
-  <div>
-  <label>使い道
-    <select id="category">
-      <option value="サーバー代">サーバー代</option>
-      <option value="スクリプト購入">スクリプト購入</option>
-      <option value="機材購入">機材購入</option>
-      <option value="雑費">雑費</option>
-      <option value="人件費">人件費</option>
-      <option value="会食費">会食費</option>
-      <option value="その他">その他</option>
-    </select>
-    <input type="text" id="categoryFree" class="hidden" placeholder="自由入力（任意）">
-  </label>
-</div>
-  <div>
-    <label>取引先
-      <select id="otherPreset">
-        <option value="">(選択しない)</option>
-        <option value="Tebex">Tebex</option>
-        <option value="VibeGAMES">VibeGAMES</option>
-        <option value="Ko-fi">Ko-fi</option>
-        <option value="Killstore">Killstore</option>
-        <option value="Etsy">Etsy</option>
-        <option value="FANBOX">FANBOX</option>
-        <option value="ZAP HOSTING">ZAP HOSTING</option>
-      </select>
-      <input type="text" id="otherFree" placeholder="自由入力（任意）">
-    </label>
-  </div>
-  <div>
-    <label>支払方法
-      <select id="payment">
-        <option value="未選択">未選択</option>
-        <option value="銀行振込">銀行振込</option>
-        <option value="クレジットカード">クレジットカード</option>
-        <option value="PayPal">PayPal</option>
-      </select>
-    </label>
-  </div>
+      <!-- 1行目 -->
+      <div>
+        <label><span>日付</span>
+          <input type="date" id="date" required>
+        </label>
+      </div>
 
-  <!-- 2行目 -->
-  <div>
-    <label>通貨
-      <select id="currency">
-        <option value="JPY">JPY（日本円）</option>
-        <option value="USD">USD（米ドル）</option>
-        <option value="EUR">EUR（ユーロ）</option>
-      </select>
-    </label>
-  </div>
-  <div>
-    <label>外貨金額
-      <input type="number" step="0.01" id="foreignAmount" placeholder="例: 12.34">
-    </label>
-  </div>
-  <div>
-    <label>為替レート
-      <input type="number" step="0.0001" id="rate" placeholder="1USD=???JPY">
-    </label>
-    <button type="button" id="autoRateBtn">自動取得</button>
-  </div>
-  <div>
-    <label>金額（円）
-      <input type="number" step="1" id="amount" placeholder="自動換算または直接入力">
-    </label>
-  </div>
+      <div>
+        <label><span>区分</span>
+          <select id="type">
+            <option value="income">収入</option>
+            <option value="expense" selected>経費</option>
+          </select>
+        </label>
+      </div>
 
-  <!-- 3行目 -->
-  <div class="wide">
-    <label>メモ
-      <input type="text" id="memo" placeholder="例：MLO/車MOD/サーバー更新など">
-    </label>
-  </div>
-  <div class="wide">
-    <label>ファイル添付（画像/PDF）
-      <input type="file" id="fileInput" accept="image/*,.pdf">
-    </label>
-  </div>
+      <div>
+        <label><span>使い道</span>
+          <select id="category">
+            <option value="サーバー代">サーバー代</option>
+            <option value="スクリプト購入">スクリプト購入</option>
+            <option value="機材購入">機材購入</option>
+            <option value="雑費">雑費</option>
+            <option value="人件費">人件費</option>
+            <option value="会食費">会食費</option>
+            <option value="その他">その他</option>
+          </select>
+          <input type="text" id="categoryFree" class="hidden" placeholder="自由入力（任意）">
+        </label>
+      </div>
 
-  <!-- 保存ボタン -->
-  <div class="wide">
-    <button type="submit" class="btn-save">保存（Driveへ自動アップロード）</button>
-  </div>
-</form>
+      <div>
+        <label><span>取引先</span>
+          <select id="otherPreset">
+            <option value="">(選択しない)</option>
+            <option value="Tebex">Tebex</option>
+            <option value="VibeGAMES">VibeGAMES</option>
+            <option value="Ko-fi">Ko-fi</option>
+            <option value="Killstore">Killstore</option>
+            <option value="Etsy">Etsy</option>
+            <option value="FANBOX">FANBOX</option>
+            <option value="ZAP HOSTING">ZAP HOSTING</option>
+          </select>
+          <input type="text" id="otherFree" placeholder="自由入力（任意）">
+        </label>
+      </div>
+
+      <!-- 2行目 -->
+      <div>
+        <label><span>支払方法</span>
+          <select id="payment">
+            <option value="未選択">未選択</option>
+            <option value="銀行振込">銀行振込</option>
+            <option value="クレジットカード">クレジットカード</option>
+            <option value="PayPal">PayPal</option>
+            <option value="現金">現金</option>
+          </select>
+        </label>
+      </div>
+
+      <div>
+        <label><span>通貨</span>
+          <select id="currency">
+            <option value="JPY">JPY（日本円）</option>
+            <option value="USD">USD（米ドル）</option>
+            <option value="EUR">EUR（ユーロ）</option>
+          </select>
+        </label>
+      </div>
+
+      <div>
+        <label><span>外貨金額</span>
+          <input type="number" step="0.01" id="foreignAmount" placeholder="例: 12.34">
+        </label>
+      </div>
+
+      <div>
+        <label><span>為替レート</span>
+          <div class="combo-input">
+            <input type="number" step="0.0001" id="rate" placeholder="1USD=???JPY">
+            <button type="button" id="autoRateBtn" class="btn">自動取得</button>
+          </div>
+          <div class="helper">外貨金額×レート＝円換算。レート未入力なら金額（円）を直接入力可</div>
+        </label>
+      </div>
+
+      <!-- 3行目 -->
+      <div class="col-2">
+        <label><span>金額（円）</span>
+          <input type="number" step="1" id="amount" placeholder="自動換算または直接入力">
+        </label>
+      </div>
+
+      <div class="col-2">
+        <label><span>メモ</span>
+          <input type="text" id="memo" placeholder="例：MLO/車MOD/サーバー更新など">
+        </label>
+      </div>
+
+      <div class="wide">
+        <label><span>ファイル添付（画像/PDF）</span>
+          <input type="file" id="fileInput" accept="image/*,.pdf">
+        </label>
+      </div>
+
+      <!-- 保存ボタン -->
+      <div class="wide sticky-actions">
+        <button type="submit" class="btn btn-primary">保存（Driveへ自動アップロード）</button>
+      </div>
+    </form>
+  </section>
 
   <!-- 一覧 -->
   <section id="tab-list" class="tab-panel">
@@ -122,9 +143,7 @@
       <label>年月<input type="month" id="filterMonth" /></label>
       <label>使い道<input type="text" id="filterCategory" placeholder="完全一致で絞り込み" /></label>
       <label>支払方法<input type="text" id="filterMethod" placeholder="完全一致で絞り込み" /></label>
-      <label>キーワード
-        <input type="text" id="filterText" placeholder="使い道/その他の内容/メモを検索" />
-      </label>
+      <label>キーワード<input type="text" id="filterText" placeholder="使い道/取引先/メモを検索" /></label>
       <button id="clearFilters" class="btn">クリア</button>
       <button id="exportCSV" class="btn">CSV出力</button>
     </div>
@@ -138,7 +157,7 @@
             <th>区分</th>
             <th>金額(JPY)</th>
             <th>外貨</th>
-            <th>その他の内容</th>
+            <th>取引先</th>
             <th>支払方法</th>
             <th>メモ</th>
             <th>添付</th>
@@ -153,7 +172,7 @@
   <!-- 集計 -->
   <section id="tab-agg" class="tab-panel">
     <div class="card">
-      <div class="row gap-sm">
+      <div class="row">
         <label>月次<input type="month" id="aggMonth" /></label>
         <label>年次<input type="number" id="aggYear" min="2000" max="2100" /></label>
         <button id="recalc" class="btn">再計算</button>
@@ -176,7 +195,7 @@
     </div>
   </section>
 
-  <!-- プレビュー -->
+  <!-- プレビュー（Driveリンク確認用） -->
   <dialog id="previewModal" class="modal">
     <div class="modal-head">
       <strong>プレビュー</strong>
@@ -185,13 +204,9 @@
     <div id="previewContainer" class="preview"></div>
   </dialog>
 
-  <!-- Google API -->
-  <script async defer src="https://apis.google.com/js/api.js"></script>
-  <script async defer src="https://accounts.google.com/gsi/client"></script>
-
+  <!-- Google API（onload で初期化を呼ぶ） -->
+  <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+  <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
   <script src="script.js"></script>
 </body>
 </html>
-
-
-
