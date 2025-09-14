@@ -211,7 +211,7 @@ form.addEventListener("submit", async (e) => {
   const type = (finalCategory.includes("収益") ? "収入" : "経費");
 
   // ファイルアップロード
-  let fileName = "", fileUrl = "";
+  let fileName = "", fileUrl = "", fileId = "";   // ← fileId を保持
   if(fileInput.files.length>0){
     const file = fileInput.files[0];
     try{
@@ -230,7 +230,7 @@ form.addEventListener("submit", async (e) => {
       });
       const data = await res.json();
       if(!data.id) throw new Error("Google Driveへのアップロードに失敗");
-      const fileId = data.id;
+      fileId = data.id; // ← ここでID取得
       fileUrl = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
       fileName = file.name;
     }catch(err){
@@ -245,14 +245,14 @@ form.addEventListener("submit", async (e) => {
     date,
     category: finalCategory,
     type,
-    // 保持はJPYと外貨の両方
-    amount: amountJPY,        // 集計用（JPY）
-    currency,                 // 通貨
+    amount: amountJPY,
+    currency,
     amountFx: (currency==="JPY" ? 0 : amountFx),
     fxRate:  (currency==="JPY" ? 1 : fxRate),
     method,
     memo,
-    fileName, fileUrl
+    fileName, fileUrl,
+    fileId // ← 追加（Drive側削除に使う）
   };
   records.push(rec);
   saveRecords();
@@ -261,6 +261,7 @@ form.addEventListener("submit", async (e) => {
   calcAggregates();
   alert("登録しました！");
 });
+
 
 /***** 一覧描画 + フィルタ *****/
 const filterMonth = document.getElementById("filterMonth");
@@ -312,6 +313,33 @@ function renderTable(){
   }
   bindPreviewLinks();
 }
+function renderTable(){
+  tableBody.innerHTML = "";
+  const rows = records.filter(passesFilters).sort((a,b)=>a.date.localeCompare(b.date));
+  for(const r of rows){
+    const tr = document.createElement("tr");
+    // 外貨表示
+    const fxCell = (r.currency && r.currency!=="JPY")
+      ? `${r.currency} ${Number(r.amountFx).toLocaleString(undefined,{maximumFractionDigits:4})} @ ${Number(r.fxRate).toLocaleString(undefined,{maximumFractionDigits:6})}`
+      : "";
+    const linkHtml = r.fileUrl ? `<a href="${r.fileUrl}" target="_blank" data-preview="${r.fileUrl}" data-name="${r.fileName}" class="preview-link">${r.fileName||"開く"}</a>` : "";
+    tr.innerHTML = `
+      <td>${r.date}</td>
+      <td>${r.category}</td>
+      <td>${r.type}</td>
+      <td>${Number(r.amount||0).toLocaleString()}</td>
+      <td>${fxCell}</td>
+      <td>${r.method||""}</td>
+      <td>${r.memo||""}</td>
+      <td>${linkHtml}</td>
+      <!-- ▼ 削除ボタン列 -->
+      <td><button class="delete-btn" data-id="${r.id}">削除</button></td>
+    `;
+    tableBody.appendChild(tr);
+  }
+  bindPreviewLinks();
+}
+
 
 /***** CSVエクスポート *****/
 document.getElementById("exportCSV").onclick = ()=>{
@@ -412,5 +440,6 @@ function openPreview(url, name){
 /***** 初期描画 *****/
 renderTable();
 calcAggregates();
+
 
 
