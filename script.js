@@ -1,391 +1,473 @@
-/***** Google Drive 連携（元の厳密版） *****/
-const CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com"; // ←必ずご自身のIDに
+/***** Google Drive 連携セットアップ（堅牢版） *****/
+const CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com";
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
 
 let tokenClient = null;
-let gapiInited = false;
-let gisInited = false;
+let gapiReady = false;
+let gisReady = false;
 
-const loginBtn = document.getElementById("loginBtn");
-const loginStatus = document.getElementById("loginStatus");
+// UI: 準備できるまでログインボタンを無効化
+const loginBtn = document.getElementById("loginButton");
+const statusEl = document.getElementById("loginStatus");
+if (loginBtn) { loginBtn.disabled = true; loginBtn.title = "読み込み中…"; }
 
-// === gapi 読み込み完了 ===
-function gapiLoaded() {
-  console.log("[auth] gapiLoaded()");
-  try {
-    gapi.load("client", async () => {
-      try {
-        await gapi.client.init({});
-        await gapi.client.load("drive", "v3");
-        gapiInited = true;
-        console.log("[auth] gapi initialized");
-        maybeEnableLogin();
-      } catch (e) {
-        console.error("[auth] gapi init error:", e);
-        alert("Google API の初期化に失敗しました。コンソールを確認してください。");
-      }
-    });
-  } catch (e) {
-    console.error("[auth] gapiLoaded wrapper error:", e);
+function setReady() {
+  if (gapiReady && gisReady) {
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.title = ""; }
   }
 }
 
-// === GIS 読み込み完了 ===
+// gapi(client) 初期化
+async function gapiLoaded() {
+  try {
+    await new Promise((resolve) => gapi.load("client", resolve));
+    await gapi.client.init({
+      discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+    });
+    gapiReady = true;
+    setReady();
+  } catch (e) {
+    console.error("[APP] gapi init failed", e);
+  }
+}
+
+// Google Identity Services 初期化
 function gisLoaded() {
-  console.log("[auth] gisLoaded()");
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
-      // 初回のレスポンス
       callback: (resp) => {
-        console.log("[auth] token callback:", resp);
-        if (resp && resp.access_token) {
-          if (loginStatus) loginStatus.textContent = "ログイン済み";
-        } else if (resp && resp.error) {
-          alert("Google 認証でエラーが発生しました: " + resp.error);
-          console.error("[auth] token error:", resp);
-        }
+        if (resp.error) { console.error(resp); return; }
+        statusEl.textContent = "ログイン済み";
       },
     });
-    gisInited = true;
-    console.log("[auth] GIS initialized");
-    maybeEnableLogin();
+    gisReady = true;
+    setReady();
   } catch (e) {
-    console.error("[auth] gisLoaded error:", e);
+    console.error("[APP] gis init failed", e);
   }
 }
 
-// === 両方 ready になったらボタンを解放 ===
-function maybeEnableLogin() {
-  if (!loginBtn) return;
-  if (gapiInited && gisInited) {
-    loginBtn.disabled = false;
-    loginBtn.classList.remove("is-disabled");
-    console.log("[auth] login button enabled");
-  }
-}
-
-// === ログインボタン ===
+// クリック時
 if (loginBtn) {
-  loginBtn.addEventListener("click", (ev) => {
-    ev.preventDefault(); // フォーム内にあっても送信させない
-    console.log("[auth] login clicked");
-
+  loginBtn.onclick = () => {
     if (!tokenClient) {
-      alert("Google ライブラリの読み込み待機中です。数秒後に再実行してください。");
+      alert("まだ準備中です。数秒後に再度お試しください。");
       return;
     }
+    tokenClient.requestAccessToken();
+  };
+}
 
-    // 最初は consent を必ず出す（invalid_client や許可ミスを目で確認できる）
-    const firstTime = !gapi.client.getToken();
-    try {
-      tokenClient.requestAccessToken({
-        prompt: firstTime ? "consent" : "",
-      });
-    } catch (e) {
-      // ポップアップブロック時など
-      console.error("[auth] requestAccessToken error:", e);
-      alert("ポップアップがブロックされた可能性があります。別タブで開く・拡張機能を無効化して再試行してください。");
-    }
+// SDK読み込み待ち（index.htmlの順序に依存しない）
+window.addEventListener("load", async () => {
+  await waitFor(() => window.gapi && typeof gapi.load === "function");
+  await gapiLoaded();
+  await waitFor(() => window.google && google.accounts && google.accounts.oauth2);
+  gisLoaded();
+});
+function waitFor(cond, timeoutMs = 10000, intervalMs = 100) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const timer = setInterval(() => {
+      if (cond()) { clearInterval(timer); resolve(); }
+      else if (Date.now() - start > timeoutMs) { clearInterval(timer); reject(new Error("timeout")); }
+    }, intervalMs);
   });
 }
 
-/** Drive アップロードのユーティリティ（既存と置換OK） */
-async function uploadToDrive(file) {
-  if (!file) return null;
-
-  // アクセストークンが無い場合は先に認証
-  if (!gapi.client.getToken()) {
-    alert("Drive にアップロードするには Google にログインしてください。");
-    return null;
-  }
-
-  try {
-    const metadata = { name: file.name, mimeType: file.type || "application/octet-stream" };
-    const boundary = "-------314159265358979323846";
-    const delimiter = "\r\n--" + boundary + "\r\n";
-    const closeDelimiter = "\r\n--" + boundary + "--";
-    const buf = await file.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-
-    const body =
-      delimiter +
-      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
-      JSON.stringify(metadata) +
-      delimiter +
-      "Content-Type: " + (file.type || "application/octet-stream") + "\r\n" +
-      "Content-Transfer-Encoding: base64\r\n\r\n" +
-      base64 +
-      closeDelimiter;
-
-    const res = await gapi.client.request({
-      path: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-      method: "POST",
-      headers: { "Content-Type": "multipart/related; boundary=" + boundary },
-      body,
-    });
-
-    const id = res.result.id;
-    return `https://drive.google.com/file/d/${id}/view`;
-  } catch (e) {
-    console.error("[drive] upload error:", e);
-    alert("Drive アップロードに失敗しました。コンソールを確認してください。");
-    return null;
-  }
-}
-
-/* ====== DOM / UI ====== */
-const tabs = document.querySelectorAll(".tab");
-const contents = document.querySelectorAll(".tab-content");
-tabs.forEach((t) => {
-  t.addEventListener("click", () => {
-    tabs.forEach((x) => x.classList.remove("active"));
-    contents.forEach((c) => c.classList.remove("active"));
-    t.classList.add("active");
-    document.getElementById(t.dataset.tab).classList.add("active");
+/***** タブ切替 *****/
+document.querySelectorAll(".tab").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.target).classList.add("active");
   });
 });
 
-/* 入力フォーム要素 */
-const form           = document.getElementById("entryForm");
-const dateEl         = document.getElementById("date");
-const typeEl         = document.getElementById("type");
-const paymentEl      = document.getElementById("payment");
-const currencyEl     = document.getElementById("currency");
-const foreignAmtEl   = document.getElementById("foreignAmount");
-const rateEl         = document.getElementById("rate");
-const autoRateBtn    = document.getElementById("autoRateBtn");
-const amountEl       = document.getElementById("amount");
-const memoEl         = document.getElementById("memo");
-const fileInput      = document.getElementById("fileInput");
+/***** データ保存（localStorage） *****/
+const STORAGE_KEY = "tc_accounting_records_v1";
+let records = loadRecords();
+function loadRecords(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }catch{ return []; } }
+function saveRecords(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); }
 
-/* 使い道 / 取引先（コンボ） */
-const categorySelect = document.getElementById("categorySelect");
-const categoryFree   = document.getElementById("categoryFree");
-const partnerSelect  = document.getElementById("partnerSelect");
-const partnerFree    = document.getElementById("partnerFree");
+/***** 多通貨：UI要素とロジック *****/
+const currencyEl = document.getElementById("currency");
+const amountFxEl = document.getElementById("amountFx");
+const fxRateEl   = document.getElementById("fxRate");
+const amountJpyEl = document.getElementById("amount");
 
-/* セレクトに入れるプリセット */
-const CATEGORY_OPTIONS = [
-  "(選択しない)",
-  "サーバー代",
-  "スクリプト購入",
-  "機材購入",
-  "雑費",
-  "人件費",
-  "会食費",
-  "その他",
-];
-const PARTNER_OPTIONS = [
-  "(選択しない)",
-  "Tebex",
-  "VibeGAMES",
-  "Ko-fi",
-  "Killstore",
-  "Etsy",
-  "FANBOX",
-  "ZAP HOSTING",
-];
+currencyEl.addEventListener("change", () => {
+  if (currencyEl.value === "JPY") {
+    amountFxEl.value = "";
+    fxRateEl.value = "";
+  }
+  recalcJPY();
+});
+[amountFxEl, fxRateEl].forEach(el => el.addEventListener("input", recalcJPY));
 
-/* セレクトを生成 */
-function populateSelect(select, options) {
-  select.innerHTML = "";
-  options.forEach((v) => {
-    const op = document.createElement("option");
-    op.value = v;
-    op.textContent = v;
-    select.appendChild(op);
-  });
+function recalcJPY(){
+  if (currencyEl.value === "JPY") return; // そのままJPY直接入力も可
+  const fx = parseFloat(amountFxEl.value || "0");
+  const rate = parseFloat(fxRateEl.value || "0");
+  if (fx>0 && rate>0){
+    amountJpyEl.value = Math.round(fx * rate);
+  }
 }
-populateSelect(categorySelect, CATEGORY_OPTIONS);
-populateSelect(partnerSelect, PARTNER_OPTIONS);
 
-/* セレクトと自由入力の同期（片方を触ったらもう片方を空に） */
-function wireCombo(selectEl, freeEl) {
-  selectEl.addEventListener("change", () => {
-    if (selectEl.value !== "(選択しない)") freeEl.value = "";
-  });
-  freeEl.addEventListener("input", () => {
-    if (freeEl.value.trim() !== "") selectEl.value = "(選択しない)";
-  });
-}
-wireCombo(categorySelect, categoryFree);
-wireCombo(partnerSelect, partnerFree);
+/***** 為替レート（CurrencyAPI + フォールバック） *****/
+const CURRENCY_API_KEY = "PUT_YOUR_CURRENCYAPI_KEY_HERE"; // ←あなたのキーに差し替え
 
-/* ====== 外貨レート自動取得 ======
- * 無料API： https://open.er-api.com/v6/latest/{BASE}
- * レートは JPY を参照
- */
-autoRateBtn?.addEventListener("click", async () => {
+async function fetchExchangeRate(baseCurrency, targetCurrency = "JPY") {
+  if (!CURRENCY_API_KEY || CURRENCY_API_KEY.includes("PUT_YOUR")) return null;
+  const url = `https://api.currencyapi.com/v3/latest?apikey=${CURRENCY_API_KEY}&base_currency=${baseCurrency}&currencies=${targetCurrency}`;
   try {
-    const base = currencyEl.value;
-    if (base === "JPY") {
-      alert("通貨が JPY の場合、為替レートは不要です。");
-      return;
-    }
-    const res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("API error");
     const data = await res.json();
-    if (data.result !== "success" || !data.rates?.JPY) {
-      throw new Error("rate API error");
-    }
-    const r = data.rates.JPY;
-    rateEl.value = `1${base}=${r.toFixed(3)}JPY`;
+    return data.data[targetCurrency].value;
+  } catch (err) {
+    console.error("為替レート取得失敗:", err);
+    return null;
+  }
+}
 
-    // 外貨金額があれば自動計算
-    const fa = parseFloat(foreignAmtEl.value);
-    if (!isNaN(fa)) {
-      amountEl.value = (fa * r).toFixed(2);
+// HTMLのボタンから呼ぶ
+async function fetchFxRate(){
+  try{
+    const ccy = currencyEl.value;
+    if (ccy === "JPY") { alert("通貨がJPYのため為替は不要です。"); return; }
+
+    // 1) CurrencyAPI
+    let rate = await fetchExchangeRate(ccy, "JPY");
+
+    // 2) exchangerate.host（指定日対応）
+    if (!rate) {
+      const date = document.getElementById("date").value || new Date().toISOString().slice(0,10);
+      try {
+        const u = `https://api.exchangerate.host/convert?from=${encodeURIComponent(ccy)}&to=JPY&date=${date}`;
+        const r = await fetch(u);
+        const j = await r.json();
+        if (j && typeof j.result === "number") rate = j.result;
+      } catch {}
     }
-  } catch (e) {
+
+    // 3) er-api（最新）
+    if (!rate) {
+      const u2 = `https://open.er-api.com/v6/latest/${encodeURIComponent(ccy)}`;
+      const r2 = await fetch(u2);
+      const j2 = await r2.json();
+      if (j2 && j2.result === "success" && j2.rates && typeof j2.rates.JPY === "number") {
+        rate = j2.rates.JPY;
+      }
+    }
+
+    if (!rate) throw new Error("rate not found");
+    fxRateEl.value = Number(rate).toFixed(6);
+    recalcJPY();
+  }catch(e){
     console.error(e);
     alert("為替レートの自動取得に失敗しました。レートを手入力してください。");
   }
-});
-
-/* ====== データ保存（テーブル表示＋Drive アップロード） ====== */
-const tableBody = document.querySelector("#recordsTable tbody");
-let records = [];
-
-function resolveCombo(selectEl, freeEl) {
-  const s = selectEl.value;
-  const f = freeEl.value.trim();
-  return f !== "" ? f : (s === "(選択しない)" ? "" : s);
 }
 
-async function uploadToDrive(file) {
-  // 未ログインならスキップ（ユーザー保存だけ行う）
-  if (!gapiInited || !tokenClient) return null;
-  try {
-    // トークンがない場合は取得しておく（2回目以降は使い回し）
-    tokenClient.callback = () => {};
-    google.accounts.oauth2.hasGrantedAllScopes(
-      google.accounts.oauth2.getToken(),
-      SCOPES
-    ) || tokenClient.requestAccessToken({ prompt: "" });
-
-    const metadata = {
-      name: file.name,
-      mimeType: file.type || "application/octet-stream",
-    };
-    const boundary = "-------314159265358979323846";
-    const delimiter = `\r\n--${boundary}\r\n`;
-    const closeDelim = `\r\n--${boundary}--`;
-    const reader = await file.arrayBuffer();
-    const base64Data = btoa(String.fromCharCode(...new Uint8Array(reader)));
-    const contentType = file.type || "application/octet-stream";
-
-    const multipartRequestBody =
-      delimiter +
-      "Content-Type: application/json\r\n\r\n" +
-      JSON.stringify(metadata) +
-      delimiter +
-      "Content-Type: " +
-      contentType +
-      "\r\n" +
-      "Content-Transfer-Encoding: base64\r\n" +
-      "\r\n" +
-      base64Data +
-      closeDelim;
-
-    const res = await gapi.client.request({
-      path: "/upload/drive/v3/files",
-      method: "POST",
-      params: { uploadType: "multipart" },
-      headers: {
-        "Content-Type": `multipart/related; boundary="${boundary}"`,
-      },
-      body: multipartRequestBody,
-    });
-    return `https://drive.google.com/file/d/${res.result.id}/view`;
-  } catch (e) {
-    console.warn("Drive upload skipped:", e);
-    return null;
-  }
-}
-
-function renderTable() {
-  tableBody.innerHTML = "";
-  records.forEach((r, idx) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${r.date}</td>
-      <td>${r.type}</td>
-      <td>${r.category}</td>
-      <td>${r.partner}</td>
-      <td>${r.payment}</td>
-      <td>${r.currency}</td>
-      <td>${r.foreignAmount ?? ""}</td>
-      <td>${r.rate ?? ""}</td>
-      <td>${r.amount ?? ""}</td>
-      <td>${r.memo ?? ""}</td>
-      <td>${r.fileUrl ? `<a href="${r.fileUrl}" target="_blank">添付</a>` : ""}</td>
-      <td><button data-del="${idx}" class="btn btn-outline">削除</button></td>
-    `;
-    tableBody.appendChild(tr);
+/***** Drive utils *****/
+// 公開権限付与（anyone, reader）
+async function makeFilePublic(fileId) {
+  const token = gapi.client.getToken()?.access_token;
+  if (!token) throw new Error("No access token");
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`, {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ role: "reader", type: "anyone" })
   });
+  if (!res.ok) throw new Error(await res.text());
 }
+function drivePreviewUrl(fileId){ return `https://drive.google.com/file/d/${fileId}/preview`; }
+function driveViewUrl(fileId){ return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`; }
 
-tableBody.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-del]");
-  if (!btn) return;
-  const i = Number(btn.dataset.del);
-  records.splice(i, 1);
-  renderTable();
-});
+/***** 入力フォーム処理（Driveアップロード→登録） *****/
+const form = document.getElementById("entryForm");
+const tableBody = document.querySelector("#recordsTable tbody");
 
-form?.addEventListener("submit", async (e) => {
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  // 金額の自動計算（外貨×レート → 円） – rate が "1USD=xxxJPY" 形式の場合もOK
-  if (!amountEl.value && foreignAmtEl.value && rateEl.value) {
-    const m = String(rateEl.value).match(/=(\d+(\.\d+)?)JPY/i);
-    const rateNum = m ? Number(m[1]) : Number(rateEl.value);
-    const fa = Number(foreignAmtEl.value);
-    if (!isNaN(rateNum) && !isNaN(fa)) {
-      amountEl.value = (rateNum * fa).toFixed(2);
+  const date = document.getElementById("date").value;
+  const category = document.getElementById("category").value;
+  const customCategory = document.getElementById("customCategory").value.trim();
+  const method = document.getElementById("method").value;
+
+  const currency = currencyEl.value || "JPY";
+  const amountFx = parseFloat(amountFxEl.value || "0");
+  const fxRate   = parseFloat(fxRateEl.value || "0");
+  const amountJPY = parseInt(document.getElementById("amount").value || "0", 10);
+
+  const memo = document.getElementById("memo").value.trim();
+  const fileInput = document.getElementById("fileInput");
+
+  // 入力チェック
+  if(!date){ alert("日付は必須です"); return; }
+  if(currency === "JPY"){
+    if(!amountJPY){ alert("金額（円）は必須です"); return; }
+  }else{
+    if(!amountFx || !fxRate){ alert("外貨金額とレートを入力してください（自動取得も可）"); return; }
+  }
+
+  const finalCategory = (customCategory || category);
+  const type = (finalCategory.includes("収益") ? "収入" : "経費");
+
+  // ファイルアップロード（任意）
+  let fileName = "", fileUrl = "", fileId = "", previewUrl = "";
+  if (fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    try {
+      const accessToken = gapi.client.getToken()?.access_token;
+      if (!accessToken) { alert("先に『Googleにログイン』してください"); return; }
+
+      const metadata = { name: file.name, mimeType: file.type };
+      const fd = new FormData();
+      fd.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+      fd.append("file", file);
+
+      // アップロード（idのみ受け取る）
+      const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+        method: "POST",
+        headers: new Headers({ Authorization: "Bearer " + accessToken }),
+        body: fd
+      });
+      const data = await res.json();
+      if (!data.id) throw new Error("Google Driveへのアップロードに失敗");
+      fileId = data.id;
+      fileName = file.name;
+
+      // 公開権限付与 → URL作成
+      await makeFilePublic(fileId);
+      fileUrl = driveViewUrl(fileId);
+      previewUrl = drivePreviewUrl(fileId);
+
+    } catch (err) {
+      console.error(err);
+      alert("ファイルのアップロードに失敗しました。もう一度お試しください。");
+      return;
     }
   }
 
-  const record = {
-    date: dateEl.value,
-    type: typeEl.value,
-    category: resolveCombo(categorySelect, categoryFree),
-    partner: resolveCombo(partnerSelect, partnerFree),
-    payment: paymentEl.value,
-    currency: currencyEl.value,
-    foreignAmount: foreignAmtEl.value || "",
-    rate: rateEl.value || "",
-    amount: amountEl.value || "",
-    memo: memoEl.value || "",
-    fileUrl: "",
+  // ここが唯一の rec 定義（重複なし！）
+  const rec = {
+    id: crypto.randomUUID(),
+    date,
+    category: finalCategory,
+    type,
+    amount: amountJPY,
+    currency,
+    amountFx: (currency==="JPY" ? 0 : amountFx),
+    fxRate:  (currency==="JPY" ? 1 : fxRate),
+    method,
+    memo,
+    fileName,
+    fileUrl,
+    fileId,
+    previewUrl // 追加：iframeプレビュー用
   };
 
-  // Drive アップロード（ログイン済み＋ファイル指定時）
-  const file = fileInput.files?.[0];
-  if (file) {
-    const url = await uploadToDrive(file);
-    if (url) record.fileUrl = url;
-  }
-
-  records.push(record);
-  renderTable();
-
-  // 入力クリア
+  records.push(rec);
+  saveRecords();
   form.reset();
-  categorySelect.value = "(選択しない)";
-  partnerSelect.value  = "(選択しない)";
+  renderTable();
+  calcAggregates();
+  alert("登録しました！");
 });
 
-/* 初期値：今日 */
-(function initToday() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  if (dateEl) dateEl.value = `${yyyy}-${mm}-${dd}`;
-})();
+/***** フィルタ & 一覧描画 *****/
+const filterMonth = document.getElementById("filterMonth");
+const filterCategory = document.getElementById("filterCategory");
+const filterMethod = document.getElementById("filterMethod");
+const filterText = document.getElementById("filterText");
+document.getElementById("clearFilters").onclick = ()=>{
+  filterMonth.value = ""; filterCategory.value=""; filterMethod.value=""; filterText.value="";
+  renderTable();
+};
+[filterMonth, filterCategory, filterMethod, filterText].forEach(el=>el.addEventListener("input", renderTable));
 
+function passesFilters(r){
+  if(filterMonth.value){
+    const ym = filterMonth.value; // "YYYY-MM"
+    if(!r.date?.startsWith(ym)) return false;
+  }
+  if(filterCategory.value && r.category!==filterCategory.value) return false;
+  if(filterMethod.value && r.method!==filterMethod.value) return false;
+  const q = filterText.value.trim();
+  if(q){
+    const hay = `${r.category} ${r.memo}`.toLowerCase();
+    if(!hay.includes(q.toLowerCase())) return false;
+  }
+  return true;
+}
 
+function renderTable(){
+  tableBody.innerHTML = "";
+  const rows = records.filter(passesFilters).sort((a,b)=>a.date.localeCompare(b.date));
+  for(const r of rows){
+    const tr = document.createElement("tr");
+    const fxCell = (r.currency && r.currency!=="JPY")
+      ? `${r.currency} ${Number(r.amountFx).toLocaleString(undefined,{maximumFractionDigits:4})} @ ${Number(r.fxRate).toLocaleString(undefined,{maximumFractionDigits:6})}`
+      : "";
 
+    const linkHtml = r.fileUrl
+      ? `<a href="${r.fileUrl}" target="_blank" data-preview="${r.previewUrl || r.fileUrl}" data-name="${r.fileName}" class="preview-link">${r.fileName||"開く"}</a>`
+      : "";
 
+    tr.innerHTML = `
+      <td>${r.date}</td>
+      <td>${r.category}</td>
+      <td>${r.type}</td>
+      <td>${Number(r.amount||0).toLocaleString()}</td>
+      <td>${fxCell}</td>
+      <td>${r.method||""}</td>
+      <td>${r.memo||""}</td>
+      <td>${linkHtml}</td>
+      <td><button class="btn-danger delete-btn" data-id="${r.id}">削除</button></td>
+    `;
+    tableBody.appendChild(tr);
+  }
+  bindPreviewLinks();
+}
+
+/***** CSVエクスポート *****/
+document.getElementById("exportCSV").onclick = ()=>{
+  const rows = records.filter(passesFilters).sort((a,b)=>a.date.localeCompare(b.date));
+  const header = ["ID","日付","使い道","区分","金額JPY","通貨","外貨金額","為替レート","支払方法","メモ","ファイル名","ファイルURL"];
+  const csv = [header.join(",")].concat(
+    rows.map(r=>[
+      r.id, r.date, esc(r.category), r.type, r.amount,
+      r.currency||"JPY", r.amountFx||0, r.fxRate||1,
+      esc(r.method||""), esc(r.memo||""), esc(r.fileName||""), r.fileUrl||""
+    ].join(","))
+  ).join("\r\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "records.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+function esc(s){ return `"${String(s).replace(/"/g,'""')}"`; }
+
+/***** 集計（月次/年次） *****/
+const aggMonth = document.getElementById("aggMonth");
+const aggYear = document.getElementById("aggYear");
+document.getElementById("recalc").onclick = calcAggregates;
+
+function calcAggregates(){
+  const ym = aggMonth.value; // "YYYY-MM" or ""
+  const year = aggYear.value ? String(aggYear.value) : "";
+
+  // 月次
+  if(ym){
+    const monthRecs = records.filter(r=>r.date?.startsWith(ym));
+    const mIncome = sumByType(monthRecs,"収入");
+    const mExpense = sumByType(monthRecs,"経費");
+    setText("mIncome", yen(mIncome));
+    setText("mExpense", yen(mExpense));
+    setText("mNet", yen(mIncome - mExpense));
+  }else{
+    setText("mIncome","-"); setText("mExpense","-"); setText("mNet","-");
+  }
+
+  // 年次
+  if(year){
+    const yearRecs = records.filter(r=>r.date?.startsWith(year+"-"));
+    const yIncome = sumByType(yearRecs,"収入");
+    const yExpense = sumByType(yearRecs,"経費");
+    setText("yIncome", yen(yIncome));
+    setText("yExpense", yen(yExpense));
+    setText("yNet", yen(yIncome - yExpense));
+
+    const tbody = document.querySelector("#monthlySummary tbody");
+    tbody.innerHTML = "";
+    for(let m=1;m<=12;m++){
+      const mm = String(m).padStart(2,"0");
+      const list = records.filter(r=>r.date?.startsWith(`${year}-${mm}`));
+      const inc = sumByType(list,"収入");
+      const exp = sumByType(list,"経費");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${m}月</td><td>${yen(inc)}</td><td>${yen(exp)}</td><td>${yen(inc-exp)}</td>`;
+      tbody.appendChild(tr);
+    }
+  }else{
+    setText("yIncome","-"); setText("yExpense","-"); setText("yNet","-");
+    document.querySelector("#monthlySummary tbody").innerHTML="";
+  }
+}
+function sumByType(list,type){ return list.filter(r=>r.type===type).reduce((s,r)=>s+Number(r.amount||0),0); }
+function yen(n){ return Number(n||0).toLocaleString(); }
+function setText(id,txt){ document.getElementById(id).innerText = txt; }
+
+/***** Driveプレビュー *****/
+function bindPreviewLinks(){
+  document.querySelectorAll("a.preview-link").forEach(a=>{
+    a.addEventListener("click",(e)=>{
+      if(e.ctrlKey || e.metaKey || e.button===1) return; // 新規タブを妨げない
+      e.preventDefault();
+      openPreview(a.dataset.preview, a.dataset.name);
+    });
+  });
+}
+const modal = document.getElementById("previewModal");
+const closeBtn = document.getElementById("closePreview");
+if (closeBtn) closeBtn.onclick = ()=>modal.close();
+function openPreview(url, name){
+  const cont = document.getElementById("previewContainer");
+  cont.innerHTML = "";
+  const iframe = document.createElement("iframe");
+  iframe.src = url;
+  iframe.title = name||"preview";
+  cont.appendChild(iframe);
+  modal.showModal();
+}
+
+/***** 初期描画 *****/
+renderTable();
+calcAggregates();
+
+/***** 行の削除 *****/
+document.getElementById("recordsTable").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".delete-btn");
+  if (!btn) return;
+
+  const id = btn.dataset.id;
+  const rec = records.find(r => r.id === id);
+  if (!rec) return;
+
+  const ok = confirm(
+    `このレコードを削除しますか？\n\n` +
+    `・日付：${rec.date}\n` +
+    `・使い道：${rec.category}\n` +
+    `・金額：${Number(rec.amount||0).toLocaleString()} JPY` +
+    `${rec.currency && rec.currency !== "JPY" ? `（${rec.currency} ${rec.amountFx} @ ${rec.fxRate}）` : ""}\n\n` +
+    `※添付があればDriveファイルも可能なら削除します。`
+  );
+  if (!ok) return;
+
+  if (rec.fileId) {
+    try {
+      const token = gapi.client.getToken()?.access_token;
+      if (token) {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(rec.fileId)}`, {
+          method: "DELETE",
+          headers: { Authorization: "Bearer " + token }
+        });
+      }
+    } catch (err) {
+      console.warn("Driveファイルの削除に失敗（レコードは削除します）：", err);
+    }
+  }
+
+  records = records.filter(r => r.id !== id);
+  saveRecords();
+  renderTable();
+  calcAggregates();
+});
