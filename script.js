@@ -33,6 +33,25 @@ function gisLoaded(){
     gisReady = true; setReady();
   }catch(e){ console.error("[gis] init failed", e); }
 }
+
+// ===== 使い道（その他）トグル表示 =====
+const category = getFinalCategory();
+
+function updateCategoryFreeVisibility() {
+  const show = categoryEl.value === 'その他';
+  categoryFreeEl.classList.toggle('hidden', !show);
+}
+function getFinalCategory() {
+  const c = categoryEl.value;
+  if (c === 'その他') {
+    const free = categoryFreeEl.value.trim();
+    return free || 'その他';
+  }
+  return c;
+}
+categoryEl.addEventListener('change', updateCategoryFreeVisibility);
+updateCategoryFreeVisibility(); // 初期状態の反映
+
 // ログイン要求
 if (loginBtn) loginBtn.onclick = () => {
   if (!tokenClient) return alert("準備中です。数秒後に再試行してください。");
@@ -382,3 +401,4 @@ document.getElementById("recordsTable").addEventListener("click", async (e)=>{
 
   records = records.filter(r=>r.id!==id); saveRecords(); renderTable(); calcAggregates();
 });
+
