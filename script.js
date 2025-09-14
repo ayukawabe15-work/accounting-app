@@ -90,7 +90,7 @@ function recalcJPY(){
   if (fx>0 && rate>0) amountJpyEl.value = Math.round(fx * rate);
 }
 
-/***** 為替レート（API 3段フェイルオーバー） *****/
+/***** 為替レート（API フェイルオーバー） *****/
 const CURRENCY_API_KEY = "PUT_YOUR_CURRENCYAPI_KEY_HERE"; // 任意：あれば精度↑
 
 async function fetchExchangeRate(baseCurrency, targetCurrency="JPY"){
@@ -108,17 +108,14 @@ async function fetchFxRate(){
   try{
     const ccy = currencyEl.value;
     if (ccy === "JPY") return alert("通貨がJPYのため為替は不要です。");
-    // 1) currencyapi
     let rate = await fetchExchangeRate(ccy,"JPY");
 
-    // 2) exchangerate.host（指定日）
     if (!rate) {
       const date = document.getElementById("date").value || new Date().toISOString().slice(0,10);
       const u = `https://api.exchangerate.host/convert?from=${encodeURIComponent(ccy)}&to=JPY&date=${date}`;
       try { const r = await fetch(u); const j = await r.json(); if (j && typeof j.result === "number") rate = j.result; } catch {}
     }
 
-    // 3) er-api（最新）
     if (!rate) {
       const u2 = `https://open.er-api.com/v6/latest/${encodeURIComponent(ccy)}`;
       const r2 = await fetch(u2); const j2 = await r2.json();
@@ -161,7 +158,7 @@ form.addEventListener("submit", async (e)=>{
 
   const otherPreset = document.getElementById("otherPreset").value;
   const otherFree   = document.getElementById("otherFree").value.trim();
-  const other       = otherFree || otherPreset || "";  // ← コンボの最終値
+  const other       = otherFree || otherPreset || "";  // ← その他の内容 最終値
 
   const method   = document.getElementById("method").value;
   const currency = currencyEl.value || "JPY";
@@ -278,7 +275,7 @@ function renderTable(){
 /***** CSV *****/
 document.getElementById("exportCSV").onclick = ()=>{
   const rows = records.filter(passesFilters).sort((a,b)=>a.date.localeCompare(b.date));
-  const header = ["ID","日付","使い道","区分","金額JPY","通貨","外貨金額","為替レート","相手先","支払方法","メモ","ファイル名","ファイルURL"];
+  const header = ["ID","日付","使い道","区分","金額JPY","通貨","外貨金額","為替レート","その他の内容","支払方法","メモ","ファイル名","ファイルURL"];
   const csv = [header.join(",")].concat(
     rows.map(r=>[
       r.id,r.date,esc(r.category),r.type,r.amount,
@@ -367,7 +364,7 @@ document.getElementById("recordsTable").addEventListener("click", async (e)=>{
     `このレコードを削除しますか？\n\n` +
     `・日付：${rec.date}\n・使い道：${rec.category}\n・金額：${Number(rec.amount||0).toLocaleString()} JPY` +
     `${rec.currency && rec.currency!=="JPY" ? `（${rec.currency} ${rec.amountFx} @ ${rec.fxRate}）` : ""}\n` +
-    `${rec.other ? `・相手先：${rec.other}\n` : ""}\n` +
+    `${rec.other ? `・その他の内容：${rec.other}\n` : ""}\n` +
     `※添付があればDriveファイルも可能なら削除します。`
   );
   if (!ok) return;
