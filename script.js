@@ -441,5 +441,47 @@ function openPreview(url, name){
 renderTable();
 calcAggregates();
 
+/***** 行の削除（レコードのみ or Drive添付も同時） *****/
+// 一覧テーブル内の削除ボタンに対するイベント委譲
+document.getElementById("recordsTable").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".delete-btn");
+  if (!btn) return;
+
+  const id = btn.dataset.id;
+  const rec = records.find(r => r.id === id);
+  if (!rec) return;
+
+  const ok = confirm(
+    `このレコードを削除しますか？\n\n` +
+    `・日付：${rec.date}\n` +
+    `・使い道：${rec.category}\n` +
+    `・金額：${Number(rec.amount||0).toLocaleString()} JPY` +
+    `${rec.currency && rec.currency !== "JPY" ? `（${rec.currency} ${rec.amountFx} @ ${rec.fxRate}）` : ""}\n\n` +
+    `※添付があればDriveファイルも可能なら削除します。`
+  );
+  if (!ok) return;
+
+  // 添付のDriveファイルも削除（fileIdがある場合のみ）
+  if (rec.fileId) {
+    try {
+      const token = gapi.client.getToken()?.access_token;
+      if (token) {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(rec.fileId)}`, {
+          method: "DELETE",
+          headers: { Authorization: "Bearer " + token }
+        });
+      }
+    } catch (err) {
+      console.warn("Driveファイルの削除に失敗（レコードは削除します）：", err);
+    }
+  }
+
+  // ローカル保存から削除 → 再描画・再集計
+  records = records.filter(r => r.id !== id);
+  saveRecords();
+  renderTable();
+  calcAggregates();
+});
+
 
 
