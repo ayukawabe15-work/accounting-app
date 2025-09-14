@@ -32,6 +32,15 @@
           <input type="date" id="date" required />
         </label>
 
+        <!-- 区分（収入/支出） -->
+        <label>
+          区分
+          <select id="sectionType">
+            <option value="支出">支出</option>
+            <option value="収入">収入</option>
+          </select>
+        </label>
+
         <label>
           使い道
           <select id="category">
@@ -43,9 +52,23 @@
           </select>
         </label>
 
-        <label>
-          その他の内容（任意）
-          <input type="text" id="customCategory" placeholder="自由入力" />
+        <!-- 取引先：プルダウン＋自由入力 -->
+        <label class="col-2">
+          取引先（選択または自由入力）
+          <div class="vendor-row">
+            <select id="vendorSelect">
+              <option value="">（選択しない）</option>
+              <option>Tebex</option>
+              <option>VibeGAMES</option>
+              <option>Ko-fi</option>
+              <option>Killstore</option>
+              <option>Etsy</option>
+              <option>FANBOX</option>
+              <option>ZAP HOSTING</option>
+              <option value="__free__">→ 自由入力</option>
+            </select>
+            <input type="text" id="vendorFree" placeholder="自由入力（任意）" />
+          </div>
         </label>
 
         <label>
@@ -120,7 +143,7 @@
         <input type="text" id="filterMethod" placeholder="完全一致で絞り込み" />
       </label>
       <label>キーワード
-        <input type="text" id="filterText" placeholder="使い道/メモを検索" />
+        <input type="text" id="filterText" placeholder="使い道/メモ/取引先を検索" />
       </label>
       <button id="clearFilters" class="btn">クリア</button>
       <button id="exportCSV" class="btn">CSV出力</button>
@@ -136,6 +159,7 @@
             <th>金額(JPY)</th>
             <th>外貨</th>
             <th>支払方法</th>
+            <th>取引先</th>
             <th>メモ</th>
             <th>添付</th>
             <th>操作</th>
