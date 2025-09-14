@@ -1,72 +1,122 @@
-/***********************
- * 会計アプリ – フロント完全版
- * 1) Google Drive 連携（ログイン）
- * 2) 使い道／取引先：プリセット＋自由入力のコンボ
- * 3) タブ切替／一覧表示／削除
- * 4) 外貨レート自動取得（open.er-api.com）
- * 5) 添付ファイルを Drive にアップロード（drive.file 権限）
- ************************/
+/***** Google Drive 連携（元の厳密版） *****/
+const CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com"; // ←必ずご自身のIDに
+const SCOPES = "https://www.googleapis.com/auth/drive.file";
 
-/* ====== Google Drive 連携（変更ポイントは CLIENT_ID のみ） ====== */
-const CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com"; // ← 転記してください
-const SCOPES   = "https://www.googleapis.com/auth/drive.file";
-
-let tokenClient;
+let tokenClient = null;
 let gapiInited = false;
-let gisInited  = false;
+let gisInited = false;
 
-const loginBtn    = document.getElementById("loginButton");
+const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
-if (loginBtn) {
-  loginBtn.classList.add("is-disabled");
-  loginBtn.disabled = true;
-  loginBtn.addEventListener("click", () => {
-    if (!tokenClient) return;
-    tokenClient.callback = (resp) => {
-      if (resp.error) {
-        alert("ログインに失敗しました");
-        return;
-      }
-      loginStatus.textContent = "ログイン済み";
-    };
-    tokenClient.requestAccessToken({ prompt: "consent" });
-  });
+
+// gapi 読み込み完了で呼ばれる（index.html の onload から）
+function gapiLoaded() {
+  try {
+    gapi.load("client", initializeGapiClient);
+  } catch (e) {
+    console.error("gapiLoaded error:", e);
+  }
 }
 
-/* gapi & gis の onload コールバック（index.html から呼ばれる） */
-window.gapiLoaded = async () => {
+async function initializeGapiClient() {
   try {
-    await new Promise((resolve) => gapi.load("client", resolve));
     await gapi.client.init({});
-    await gapi.client.load("drive", "v3");
+    await gapi.client.load("drive", "v3"); // Drive の discovery をロード
     gapiInited = true;
     maybeEnableLogin();
   } catch (e) {
-    console.error(e);
-    alert("Googleライブラリの読み込み待機中です。数秒後に再試行してください。");
+    console.error("initializeGapiClient error:", e);
   }
-};
-window.gisLoaded = () => {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: () => {},
-  });
-  gisInited = true;
-  maybeEnableLogin();
-};
+}
+
+// GIS 読み込み完了で呼ばれる（index.html の onload から）
+function gisLoaded() {
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (resp) => {
+        if (resp.error) {
+          console.error(resp);
+          alert("Google 連携でエラーが発生しました。");
+          return;
+        }
+        if (loginStatus) loginStatus.textContent = "ログイン済み";
+      },
+    });
+    gisInited = true;
+    maybeEnableLogin();
+  } catch (e) {
+    console.error("gisLoaded error:", e);
+  }
+}
+
+// ★ 元の仕様：gapi と GIS が両方 ready になったらボタンを有効化
 function maybeEnableLogin() {
-  if (gisInited && loginBtn) {
+  if (gapiInited && gisInited && loginBtn) {
     loginBtn.disabled = false;
     loginBtn.classList.remove("is-disabled");
   }
 }
-async function ensureGapiReady() {
-  if (gapiInited) return;
-  await new Promise((resolve) => gapi.load("client", resolve));
-  await gapi.client.init({});
-  await gapi.client.load("drive", "v3");
-  gapiInited = true;
+
+// ログインボタン
+if (loginBtn) {
+  loginBtn.addEventListener("click", () => {
+    if (!tokenClient) {
+      alert("Google ライブラリの読み込み待機中です。少し待って再度お試しください。");
+      return;
+    }
+    tokenClient.requestAccessToken({ prompt: "" }); // 既存許可なら無言取得
+  });
+}
+
+/** Drive アップロード（従来前提: gapi は既にロード済み） */
+async function uploadToDrive(file) {
+  if (!file) return null;
+
+  // アクセストークンが無い場合は事前にログインしてもらう
+  if (!gapi.client.getToken()) {
+    alert("Drive にアップロードするには Google にログインしてください。");
+    return null;
+  }
+
+  const metadata = {
+    name: file.name,
+    mimeType: file.type || "application/octet-stream",
+  };
+  const boundary = "-------314159265358979323846";
+  const delimiter = "\r\n--" + boundary + "\r\n";
+  const closeDelimiter = "\r\n--" + boundary + "--";
+
+  const reader = await file.arrayBuffer();
+  const base64Data = btoa(String.fromCharCode(...new Uint8Array(reader)));
+  const multipartRequestBody =
+    delimiter +
+    "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+    JSON.stringify(metadata) +
+    delimiter +
+    "Content-Type: " + (file.type || "application/octet-stream") + "\r\n" +
+    "Content-Transfer-Encoding: base64\r\n\r\n" +
+    base64Data +
+    closeDelimiter;
+
+  try {
+    const res = await gapi.client.request({
+      path: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+      method: "POST",
+      headers: {
+        "Content-Type": "multipart/related; boundary=" + boundary,
+      },
+      body: multipartRequestBody,
+    });
+    // 共有リンクを返す（必要なら共有設定 API 呼び出しを追加）
+    const fileId = res.result.id;
+    return `https://drive.google.com/file/d/${fileId}/view`;
+  } catch (e) {
+    console.error("uploadToDrive error:", e);
+    alert("Drive へのアップロードに失敗しました。");
+    return null;
+  }
 }
 
 /* ====== DOM / UI ====== */
@@ -319,5 +369,6 @@ form?.addEventListener("submit", async (e) => {
   const dd = String(d.getDate()).padStart(2, "0");
   if (dateEl) dateEl.value = `${yyyy}-${mm}-${dd}`;
 })();
+
 
 
