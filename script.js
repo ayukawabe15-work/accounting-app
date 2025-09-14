@@ -90,6 +90,16 @@ async function fetchExchangeRate(base, target) {
     return null;
   }
 }
+document.getElementById("rateFetch").addEventListener("click", async () => {
+  const base = document.getElementById("currency").value; // 例: USD
+  const target = "JPY";
+  const rate = await fetchExchangeRate(base, target);
+  if (rate) {
+    document.getElementById("rate").value = rate.toFixed(4);
+  } else {
+    alert("為替レートの自動取得に失敗しました。手動入力してください。");
+  }
+});
 
 /* ====== 金額自動計算（外貨×レート） ====== */
 function calcAmount() {
@@ -347,5 +357,6 @@ document.querySelectorAll(".tab").forEach(btn=>{
 /* ====== 初期描画 ====== */
 renderTable();
 recalcSummary();
+
 
 
