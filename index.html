@@ -5,6 +5,8 @@
   <title>会計アプリ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
+  <!-- 任意：空faviconで404警告を消す -->
+  <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 </head>
 <body>
   <header class="appbar">
@@ -52,6 +54,37 @@
             <option>その他</option>
           </select>
         </label>
+
+        <!-- ▼ 多通貨対応エリア -->
+        <label>通貨
+          <select id="currency">
+            <option value="JPY">JPY（日本円）</option>
+            <option value="USD">USD（米ドル）</option>
+            <option value="EUR">EUR（ユーロ）</option>
+            <option value="GBP">GBP（ポンド）</option>
+            <option value="CNY">CNY（人民元）</option>
+            <option value="KRW">KRW（韓国ウォン）</option>
+            <option value="AUD">AUD（豪ドル）</option>
+            <option value="CAD">CAD（カナダドル）</option>
+            <option value="SGD">SGD（シンガポールドル）</option>
+            <option value="THB">THB（バーツ）</option>
+            <option value="PHP">PHP（ペソ）</option>
+            <option value="VND">VND（ドン）</option>
+            <option value="IDR">IDR（ルピア）</option>
+          </select>
+        </label>
+
+        <label>外貨金額（通貨がJPY以外のとき）
+          <input type="number" id="amountFx" min="0" step="0.01" placeholder="例）25.99" />
+        </label>
+
+        <label>為替レート（1 通貨 → JPY）
+          <div style="display:flex;gap:8px">
+            <input type="number" id="fxRate" min="0" step="0.0001" placeholder="例）USD→JPY 151.23" />
+            <button type="button" id="autoRateBtn">自動取得</button>
+          </div>
+        </label>
+        <!-- ▲ 多通貨対応エリア -->
 
         <label>金額（円）
           <input type="number" id="amount" min="0" step="1" required />
@@ -109,7 +142,8 @@
               <th>日付</th>
               <th>使い道</th>
               <th>区分</th>
-              <th>金額</th>
+              <th>金額(JPY)</th>
+              <th>外貨</th>
               <th>支払方法</th>
               <th>メモ</th>
               <th>添付</th>
@@ -164,12 +198,9 @@
     <div id="previewContainer"></div>
   </dialog>
 
-  <!-- Google API -->
-<script src="https://apis.google.com/js/api.js"></script>
-<script src="https://accounts.google.com/gsi/client"></script>
-
-<!-- あなたのスクリプト（最後に読む） -->
-<script src="script.js"></script>
+  <!-- Google API（外部SDK） -->
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client"></script>
+  <script src="script.js"></script>
 </body>
 </html>
-
