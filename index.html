@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
   <title>会計アプリ</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -19,7 +20,11 @@
   </header>
 
   <main class="container">
-
+    
+<div class="login-area">
+  <button id="loginBtn" type="button" disabled>Googleにログイン</button>
+  <span id="loginStatus">未ログイン</span>
+</div>
     <!-- タブ -->
     <nav class="tabs">
       <button class="tab active" data-tab="input">入力</button>
@@ -166,12 +171,11 @@
 
   </main>
 
-<!-- Google APIs & Google Identity Services -->
-  <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-  <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
-
-  <!-- アプリ本体 -->
-  <script src="script.js"></script>
+<!-- ③ body 終了直前の読み込み順はこれで固定 -->
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+<script src="script.js"></script>
 </body>
 </html>
+
 
