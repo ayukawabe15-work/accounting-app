@@ -55,11 +55,19 @@ window.gisLoaded = () => {
   gisInited = true;
   maybeEnableLogin();
 };
-function maybeEnableLogin() {
-  if (gapiInited && gisInited && loginBtn) {
-    loginBtn.disabled = false;
-    loginBtn.classList.remove("is-disabled");
-  }
+async function ensureGapiReady() {
+  if (gapiInited) return;
+  await new Promise((resolve) => gapi.load("client", resolve));
+  await gapi.client.init({});
+  await gapi.client.load("drive", "v3");
+  gapiInited = true;
+}
+async function ensureGapiReady() {
+  if (gapiInited) return;
+  await new Promise((resolve) => gapi.load("client", resolve));
+  await gapi.client.init({});
+  await gapi.client.load("drive", "v3");
+  gapiInited = true;
 }
 
 /* ====== DOM / UI ====== */
@@ -312,3 +320,4 @@ form?.addEventListener("submit", async (e) => {
   const dd = String(d.getDate()).padStart(2, "0");
   if (dateEl) dateEl.value = `${yyyy}-${mm}-${dd}`;
 })();
+
