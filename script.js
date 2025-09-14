@@ -236,3 +236,4 @@ function openPreview(url, name){
 /***** 初期描画 *****/
 renderTable();
 calcAggregates();
+
