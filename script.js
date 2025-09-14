@@ -1,6 +1,3 @@
-// 外部 onload で先にダミーが動いた場合に追随して初期化を完了させる
-if (window._gapiReady && typeof window.gapiLoaded === "function") window.gapiLoaded();
-if (window._gisReady  && typeof window.gisLoaded  === "function") window.gisLoaded();
 /***** Google Drive 連携 *****/
 const CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com";
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
@@ -10,6 +7,61 @@ let gapiInited = false;
 let gisInited = false;
 let accessToken = null;
 
+// ① ログインボタンを初期化（準備完了まで無効）
+const loginBtn = document.getElementById("loginButton");
+const loginStatus = document.getElementById("loginStatus");
+if (loginBtn) {
+  loginBtn.disabled = true;
+  loginBtn.classList.add("is-disabled");
+  loginBtn.title = "Google ライブラリを初期化中…";
+}
+
+/** 準備完了時にボタンを有効化 */
+function enableLoginButton() {
+  if (!loginBtn) return;
+  loginBtn.disabled = false;
+  loginBtn.classList.remove("is-disabled");
+  loginBtn.title = "";
+}
+
+// ② Google API の onload で呼ばれる関数（グローバルに公開）
+function gapiLoaded() {
+  gapi.load("client", async () => {
+    await gapi.client.init({
+      discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+    });
+    gapiInited = true;
+    if (gisInited) enableLoginButton();
+  });
+}
+function gisLoaded() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: (resp) => {
+      if (resp.error) { console.error(resp); return; }
+      accessToken = resp.access_token;
+      if (loginStatus) loginStatus.textContent = "ログイン済み";
+    },
+  });
+  gisInited = true;
+  if (gapiInited) enableLoginButton();
+}
+
+// ★ onload から確実に参照されるようにグローバルへ明示公開
+window.gapiLoaded = gapiLoaded;
+window.gisLoaded  = gisLoaded;
+
+// ③ クリック時のハンドラ（準備前に押されたら案内）
+if (loginBtn) {
+  loginBtn.addEventListener("click", () => {
+    if (!gapiInited || !gisInited || !tokenClient) {
+      alert("Google ライブラリを初期化しています。数秒後にもう一度お試しください。");
+      return;
+    }
+    tokenClient.requestAccessToken({ prompt: "" });
+  });
+}
 function gapiLoaded() {
   gapi.load('client', initializeGapiClient);
 }
@@ -161,5 +213,6 @@ function renderTable(){
     });
   });
 }
+
 
 
