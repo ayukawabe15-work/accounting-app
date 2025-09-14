@@ -210,30 +210,43 @@ form.addEventListener("submit", async (e) => {
   const finalCategory = (customCategory || category);
   const type = (finalCategory.includes("収益") ? "収入" : "経費");
 
-  // ファイルアップロード
-  let fileName = "", fileUrl = "", fileId = "";   // ← fileId を保持
-  if(fileInput.files.length>0){
+    // ファイルアップロード
+  let fileName = "", fileUrl = "", fileId = "";
+  if (fileInput.files.length > 0) {
     const file = fileInput.files[0];
-    try{
+    try {
       const accessToken = gapi.client.getToken()?.access_token;
-      if(!accessToken){ alert("先に『Googleにログイン』してください"); return; }
+      if (!accessToken) { alert("先に『Googleにログイン』してください"); return; }
 
       const metadata = { name: file.name, mimeType: file.type };
       const fd = new FormData();
-      fd.append("metadata", new Blob([JSON.stringify(metadata)], {type:"application/json"}));
+      fd.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
       fd.append("file", file);
 
+      // 1) アップロード（idのみ受け取る）
       const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
-        method:"POST",
+        method: "POST",
         headers: new Headers({ Authorization: "Bearer " + accessToken }),
         body: fd
       });
       const data = await res.json();
-      if(!data.id) throw new Error("Google Driveへのアップロードに失敗");
-      fileId = data.id; // ← ここでID取得
-      fileUrl = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+      if (!data.id) throw new Error("Google Driveへのアップロードに失敗");
+      fileId = data.id;
       fileName = file.name;
-    }catch(err){
+
+      // 2) 共有権限を anyone:reader に変更
+      await makeFilePublic(fileId);
+
+      // 3) URLをプレビュー用と表示用の両方で保持
+      fileUrl = driveViewUrl(fileId);             // 新規タブで開く用
+      const previewUrl = drivePreviewUrl(fileId); // iframeプレビュー用
+
+      // 後で使うために両方持っておく（既存構造に合わせるなら fileUrl に view を入れてOK）
+      // ここではレコード保存時に previewUrl を r.previewUrl として追加します↓
+      var _previewUrl = previewUrl;
+
+      // ↓ この下の rec オブジェクトを作る所で _previewUrl を使います
+    } catch (err) {
       console.error(err);
       alert("ファイルのアップロードに失敗しました。もう一度お試しください。");
       return;
@@ -261,6 +274,23 @@ form.addEventListener("submit", async (e) => {
   calcAggregates();
   alert("登録しました！");
 });
+
+const rec = {
+    id: crypto.randomUUID(),
+    date,
+    category: finalCategory,
+    type,
+    amount: amountJPY,
+    currency,
+    amountFx: (currency === "JPY" ? 0 : amountFx),
+    fxRate:  (currency === "JPY" ? 1 : fxRate),
+    method,
+    memo,
+    fileName, 
+    fileUrl,     // ← 既存：viewリンク
+    fileId,      // ← 既存：削除時に使用
+    previewUrl: (typeof _previewUrl !== "undefined" ? _previewUrl : "") // ← 追加：埋め込み用
+  };
 
 
 /***** 一覧描画 + フィルタ *****/
@@ -338,6 +368,39 @@ function renderTable(){
     tableBody.appendChild(tr);
   }
   bindPreviewLinks();
+}
+
+// Drive: ファイルを「リンクを知っている全員が閲覧可」にする
+async function makeFilePublic(fileId) {
+  const token = gapi.client.getToken()?.access_token;
+  if (!token) throw new Error("No access token");
+
+  // 権限付与（anyone, reader）
+  const permRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`, {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      role: "reader",
+      type: "anyone"
+    })
+  });
+
+  if (!permRes.ok) {
+    const t = await permRes.text().catch(() => "");
+    throw new Error("Set permission failed: " + t);
+  }
+}
+
+// Drive: 埋め込み用のプレビューURL（iframe向け）
+function drivePreviewUrl(fileId) {
+  return `https://drive.google.com/file/d/${fileId}/preview`;
+}
+// 新規タブでの閲覧URL（普通の共有リンク）
+function driveViewUrl(fileId) {
+  return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 }
 
 
@@ -482,6 +545,7 @@ document.getElementById("recordsTable").addEventListener("click", async (e) => {
   renderTable();
   calcAggregates();
 });
+
 
 
 
