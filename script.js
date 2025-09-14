@@ -66,27 +66,30 @@ categoryEl.addEventListener("change", toggleCategoryFree);
 toggleCategoryFree();
 
 /* ====== 為替自動取得 ====== */
-document.getElementById("autoRateBtn").addEventListener("click", async () => {
-  const cur = currencyEl.value;
-  if (cur === "JPY") {
-    rateEl.value = 1;
-    calcAmount();
-    return;
-  }
+async function fetchExchangeRate(base, target) {
   try {
-    const res = await fetch(`https://api.exchangerate.host/latest?base=${cur}&symbols=JPY`);
-    const data = await res.json();
-    if (data && data.rates && data.rates.JPY) {
-      rateEl.value = data.rates.JPY.toFixed(6);
-      calcAmount();
-    } else {
-      alert("為替レートの自動取得に失敗しました。レートを手入力してください。");
+    // exchangerate.host
+    let res = await fetch(`https://api.exchangerate.host/latest?base=${base}&symbols=${target}`);
+    if (res.ok) {
+      let data = await res.json();
+      if (data.rates && data.rates[target]) {
+        return data.rates[target];
+      }
     }
+    // フォールバック: ER-API
+    res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+    if (res.ok) {
+      let data = await res.json();
+      if (data.rates && data.rates[target]) {
+        return data.rates[target];
+      }
+    }
+    throw new Error("両方のAPIで失敗");
   } catch (e) {
-    console.error(e);
-    alert("為替レートの自動取得に失敗しました。レートを手入力してください。");
+    console.error("為替レート取得エラー:", e);
+    return null;
   }
-});
+}
 
 /* ====== 金額自動計算（外貨×レート） ====== */
 function calcAmount() {
@@ -344,4 +347,5 @@ document.querySelectorAll(".tab").forEach(btn=>{
 /* ====== 初期描画 ====== */
 renderTable();
 recalcSummary();
+
 
