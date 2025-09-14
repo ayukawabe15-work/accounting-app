@@ -10,82 +10,167 @@ let accessToken = null;
 // ① ログインボタンを初期化（準備完了まで無効）
 const loginBtn = document.getElementById("loginButton");
 const loginStatus = document.getElementById("loginStatus");
+
 if (loginBtn) {
-  loginBtn.disabled = true;
+  loginBtn.disabled = true; // 初期化完了まで押せない
   loginBtn.classList.add("is-disabled");
-  loginBtn.title = "Google ライブラリを初期化中…";
 }
 
-/** 準備完了時にボタンを有効化 */
-function enableLoginButton() {
-  if (!loginBtn) return;
-  loginBtn.disabled = false;
-  loginBtn.classList.remove("is-disabled");
-  loginBtn.title = "";
-}
-
-// ② Google API の onload で呼ばれる関数（グローバルに公開）
-function gapiLoaded() {
+// onload から参照できるようにグローバル公開
+window.gapiLoaded = function () {
   gapi.load("client", async () => {
     await gapi.client.init({
       discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
     });
     gapiInited = true;
-    if (gisInited) enableLoginButton();
+    maybeEnableLogin();
   });
-}
-function gisLoaded() {
+};
+
+// onload から参照できるようにグローバル公開
+window.gapiLoaded = function () {
+  gapi.load("client", async () => {
+    await gapi.client.init({
+      discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+    });
+    gapiInited = true;
+    maybeEnableLogin();
+  });
+};
+
+window.gisLoaded = function () {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
     callback: (resp) => {
-      if (resp.error) { console.error(resp); return; }
+      if (resp.error) {
+        console.error(resp);
+        alert("Google認証でエラーが発生しました");
+        return;
+      }
       accessToken = resp.access_token;
       if (loginStatus) loginStatus.textContent = "ログイン済み";
     },
   });
   gisInited = true;
-  if (gapiInited) enableLoginButton();
+  maybeEnableLogin();
+};
+
+function maybeEnableLogin() {
+  if (gapiInited && gisInited && loginBtn) {
+    loginBtn.disabled = false;
+    loginBtn.classList.remove("is-disabled");
+  }
 }
 
-// ★ onload から確実に参照されるようにグローバルへ明示公開
-window.gapiLoaded = gapiLoaded;
-window.gisLoaded  = gisLoaded;
-
-// ③ クリック時のハンドラ（準備前に押されたら案内）
 if (loginBtn) {
   loginBtn.addEventListener("click", () => {
-    if (!gapiInited || !gisInited || !tokenClient) {
-      alert("Google ライブラリを初期化しています。数秒後にもう一度お試しください。");
+    if (!tokenClient) {
+      alert("初期化中です。数秒後にもう一度お試しください。");
       return;
     }
     tokenClient.requestAccessToken({ prompt: "" });
   });
 }
-function gapiLoaded() {
-  gapi.load('client', initializeGapiClient);
-}
-async function initializeGapiClient() {
-  await gapi.client.init({
-    discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+/***** 使い道 / 取引先：プリセット + 自由入力 *****/
+// プリセット（必要に応じて編集・追加OK）
+const CATEGORY_PRESETS = [
+  "(選択しない)",
+  "サーバー代",
+  "スクリプト購入",
+  "機材購入",
+  "雑費",
+  "人件費",
+  "会食費",
+  "広告費",
+  "その他",
+  "――",
+  "自由入力（任意）"
+];
+
+const PARTNER_PRESETS = [
+  "(選択しない)",
+  "Tebex",
+  "VibeGAMES",
+  "Ko-fi",
+  "Killstore",
+  "Etsy",
+  "FANBOX",
+  "ZAP HOSTING",
+  "その他",
+  "――",
+  "自由入力（任意）"
+];
+
+// セレクトと入力の同期ユーティリティ
+function setupCombo(selectId, inputId, presets) {
+  const sel = document.getElementById(selectId);
+  const inp = document.getElementById(inputId);
+  if (!sel || !inp) return;
+
+  // optionを動的生成
+  sel.innerHTML = "";
+  presets.forEach((label) => {
+    const opt = document.createElement("option");
+    opt.value = label;
+    opt.textContent = label;
+    sel.appendChild(opt);
   });
-  gapiInited = true;
-}
-function gisLoaded() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: (resp) => {
-      if (resp.error) throw resp;
-      accessToken = resp.access_token;
-      document.getElementById("loginStatus").innerText = "ログイン済み";
-    },
+
+  // 初期状態
+  sel.value = "(選択しない)";
+  inp.value = "";
+  // “自由入力（任意）” 以外を選んだら入力欄に反映、自由入力を選んだら入力欄フォーカス
+  sel.addEventListener("change", () => {
+    if (sel.value === "自由入力（任意）" || sel.value === "その他") {
+      inp.focus();
+      inp.select();
+    } else if (sel.value === "(選択しない)" || sel.value === "――") {
+      // 何もしない
+    } else {
+      inp.value = sel.value;
+    }
   });
-  gisInited = true;
+
+  // 入力欄を手で変えた場合：セレクトを“自由入力（任意）”に切り替え
+  inp.addEventListener("input", () => {
+    if (inp.value && sel.value !== "自由入力（任意）") {
+      sel.value = "自由入力（任意）";
+    }
+  });
 }
-document.getElementById("loginButton").onclick = () => {
-  if (tokenClient) tokenClient.requestAccessToken();
-};
+
+// 保存時に読み取るユーティリティ（あなたの保存ロジックで利用）
+function getComboValue(selectId, inputId) {
+  const sel = document.getElementById(selectId);
+  const inp = document.getElementById(inputId);
+  if (!sel || !inp) return "";
+  const v = inp.value.trim();
+  if (v) return v;
+  if (sel.value && sel.value !== "(選択しない)" && sel.value !== "――" && sel.value !== "自由入力（任意）") {
+    return sel.value;
+  }
+  return ""; // 未入力扱い
+}
+
+/***** 初期化 *****/
+document.addEventListener("DOMContentLoaded", () => {
+  setupCombo("categorySelect", "categoryFree", CATEGORY_PRESETS);
+  setupCombo("partnerSelect",  "partnerFree",  PARTNER_PRESETS);
+
+  // 例：保存時に値を取得するなら
+  const saveBtn = document.getElementById("saveBtn"); // あれば
+  if (saveBtn) {
+    saveBtn.addEventListener("click", () => {
+      const category = getComboValue("categorySelect", "categoryFree");
+      const partner  = getComboValue("partnerSelect",  "partnerFree");
+
+      // あなたの既存保存ロジックに紐づけ
+      // e.g. formData.category = category; formData.partner = partner;
+      console.log("使い道:", category, "取引先:", partner);
+    });
+  }
+});
 
 /***** タブ切替 *****/
 document.addEventListener("click", (e)=>{
@@ -213,6 +298,7 @@ function renderTable(){
     });
   });
 }
+
 
 
 
