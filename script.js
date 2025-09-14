@@ -122,9 +122,22 @@ function recalcJPY(){
   }
 }
 
-/***** 為替レート自動取得（exchangerate.host → 失敗時はer-apiにフォールバック） *****/
-const autoRateBtn = document.getElementById("autoRateBtn");
-if (autoRateBtn) autoRateBtn.addEventListener("click", fetchFxRate);
+// 為替レートをCurrencyAPIから取得
+async function fetchExchangeRate(baseCurrency, targetCurrency = "JPY") {
+  const API_KEY = "cur_live_X8hUbLuHDTzYbSFbZO7awXs5vi4CzVNs45lfmWXS";
+  const url = `https://api.currencyapi.com/v3/latest?apikey=${API_KEY}&base_currency=${baseCurrency}&currencies=${targetCurrency}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("API error");
+    const data = await res.json();
+    return data.data[targetCurrency].value; // レート数値を返す
+  } catch (err) {
+    console.error("為替レート取得失敗:", err);
+    alert("為替レートの取得に失敗しました。レートを手入力してください。");
+    return null;
+  }
+}
 
 // グローバル公開（HTMLの onclick からも呼べるように）
 async function fetchFxRate() {
@@ -399,4 +412,5 @@ function openPreview(url, name){
 /***** 初期描画 *****/
 renderTable();
 calcAggregates();
+
 
