@@ -266,7 +266,9 @@ form.addEventListener("submit", async (e) => {
     memo,
     fileName, fileUrl,
     fileId // ← 追加（Drive側削除に使う）
-  };
+    // ここを追加：アップロード直後に作った _previewUrl を保存
+  　previewUrl: (typeof _previewUrl !== "undefined" ? _previewUrl : "")
+　};
   records.push(rec);
   saveRecords();
   form.reset();
@@ -274,24 +276,6 @@ form.addEventListener("submit", async (e) => {
   calcAggregates();
   alert("登録しました！");
 });
-
-const rec = {
-    id: crypto.randomUUID(),
-    date,
-    category: finalCategory,
-    type,
-    amount: amountJPY,
-    currency,
-    amountFx: (currency === "JPY" ? 0 : amountFx),
-    fxRate:  (currency === "JPY" ? 1 : fxRate),
-    method,
-    memo,
-    fileName, 
-    fileUrl,     // ← 既存：viewリンク
-    fileId,      // ← 既存：削除時に使用
-    previewUrl: (typeof _previewUrl !== "undefined" ? _previewUrl : "") // ← 追加：埋め込み用
-  };
-
 
 /***** 一覧描画 + フィルタ *****/
 const filterMonth = document.getElementById("filterMonth");
@@ -549,6 +533,7 @@ document.getElementById("recordsTable").addEventListener("click", async (e) => {
   renderTable();
   calcAggregates();
 });
+
 
 
 
