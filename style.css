@@ -69,10 +69,6 @@ h2,h3{ font-weight:700; }
   color:#fff; border:0;
   box-shadow: 0 8px 18px rgba(255,91,105,.28);
 }
-<button type="button" id="autoRateBtn">
-  自動<br>取得
-</button>
-
 
 /* タブ */
 .tabs{
@@ -203,5 +199,6 @@ input[type="file"]{ padding:.55rem .75rem; background: var(--panel-2); }
   margin-left:.6rem; padding:.25rem .6rem; border-radius:999px;
   background:#fff; border:1px solid var(--line); color:#b73a6e; font-weight:700;
 }
+
 
 
