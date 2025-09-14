@@ -1,8 +1,5 @@
-// 外部 onload で先にダミーが動いた場合に追随して初期化を完了させる
-if (window._gapiReady && typeof window.gapiLoaded === "function") window.gapiLoaded();
-if (window._gisReady  && typeof window.gisLoaded  === "function") window.gisLoaded();
-/***** Google Drive 連携（堅牢） *****/
-const CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com"; // ←あなたのクライアントID
+/***** Google Drive 連携 *****/
+const CLIENT_ID = "＜あなたのClientID＞";
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
 
 let tokenClient;
@@ -13,14 +10,12 @@ let accessToken = null;
 function gapiLoaded() {
   gapi.load('client', initializeGapiClient);
 }
-
 async function initializeGapiClient() {
   await gapi.client.init({
     discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
   });
   gapiInited = true;
 }
-
 function gisLoaded() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
@@ -33,50 +28,60 @@ function gisLoaded() {
   });
   gisInited = true;
 }
-
 document.getElementById("loginButton").onclick = () => {
-  if (tokenClient) {
-    tokenClient.requestAccessToken();
-  }
+  if (tokenClient) tokenClient.requestAccessToken();
 };
+
+/***** タブ切替 *****/
+document.addEventListener("click", (e)=>{
+  const btn = e.target.closest(".tab");
+  if(!btn) return;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+  btn.classList.add("active");
+  const id = btn.dataset.tab;
+  document.getElementById(id).classList.add("active");
+});
 
 /***** 為替レート自動取得 *****/
 document.addEventListener("DOMContentLoaded", () => {
   const autoBtn = document.getElementById("autoRateBtn");
   if (autoBtn) {
-    autoBtn.addEventListener("click", async () => {
-      const currency = document.getElementById("currency").value;
-      if (currency === "JPY") {
-        alert("JPYの場合は不要です");
-        return;
-      }
-      try {
-        const res = await fetch(`https://open.er-api.com/v6/latest/${currency}`);
-        const data = await res.json();
-        if (data.result === "success" && data.rates.JPY) {
-          const rate = data.rates.JPY;
-          document.getElementById("rate").value = `1${currency}=${rate.toFixed(2)}JPY`;
-          const fAmt = parseFloat(document.getElementById("foreignAmount").value || "0");
-          if (fAmt) {
-            document.getElementById("amount").value = (fAmt * rate).toFixed(0);
-          }
-        } else {
-          alert("為替レートの取得に失敗しました");
-        }
-      } catch (e) {
-        alert("APIエラー: " + e.message);
-      }
-    });
+    autoBtn.addEventListener("click", fetchRateAndCalc);
   }
+  renderTable();  // 初期レンダリング
 });
 
-/***** データ保存 *****/
+async function fetchRateAndCalc(){
+  const currency = document.getElementById("currency").value;
+  if (currency === "JPY") {
+    alert("JPYの場合はレート不要です。");
+    return;
+  }
+  try {
+    const res = await fetch(`https://open.er-api.com/v6/latest/${currency}`);
+    const data = await res.json();
+    if (data.result === "success" && data.rates.JPY) {
+      const rate = data.rates.JPY;
+      document.getElementById("rate").value = `1${currency}=${rate.toFixed(2)}JPY`;
+      const fAmt = parseFloat(document.getElementById("foreignAmount").value || "0");
+      if (fAmt) {
+        document.getElementById("amount").value = Math.round(fAmt * rate);
+      }
+    } else {
+      alert("為替レートの取得に失敗しました。");
+    }
+  } catch (e) {
+    alert("APIエラー: " + e.message);
+  }
+}
+
+/***** 保存ロジック *****/
 const form = document.getElementById("entryForm");
 const tableBody = document.querySelector("#recordsTable tbody");
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-
   const rec = {
     date: document.getElementById("date").value,
     type: document.getElementById("type").value,
@@ -92,6 +97,7 @@ form.addEventListener("submit", async (e) => {
     fileUrl: null
   };
 
+  // 添付をDriveへ
   const fileInput = document.getElementById("fileInput");
   if (fileInput.files.length > 0 && accessToken) {
     const file = fileInput.files[0];
@@ -102,11 +108,7 @@ form.addEventListener("submit", async (e) => {
 
     const uploadRes = await fetch(
       "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-      {
-        method: "POST",
-        headers: { Authorization: "Bearer " + accessToken },
-        body: formData
-      }
+      { method: "POST", headers: { Authorization: "Bearer " + accessToken }, body: formData }
     );
     const result = await uploadRes.json();
     rec.fileId = result.id;
@@ -118,46 +120,41 @@ form.addEventListener("submit", async (e) => {
   form.reset();
 });
 
-function saveRecord(rec) {
+function saveRecord(rec){
   const data = JSON.parse(localStorage.getItem("records") || "[]");
   data.push(rec);
   localStorage.setItem("records", JSON.stringify(data));
 }
 
-function renderTable() {
+function renderTable(){
   tableBody.innerHTML = "";
   const data = JSON.parse(localStorage.getItem("records") || "[]");
   data.forEach((rec, idx) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${rec.date}</td>
-      <td>${rec.type}</td>
-      <td>${rec.category}</td>
-      <td>${rec.partner}</td>
-      <td>${rec.payment}</td>
-      <td>${rec.currency}</td>
-      <td>${rec.foreignAmount}</td>
-      <td>${rec.rate}</td>
-      <td>${rec.amount}</td>
-      <td>${rec.memo}</td>
+      <td>${rec.date || ""}</td>
+      <td>${rec.type || ""}</td>
+      <td>${rec.category || ""}</td>
+      <td>${rec.partner || ""}</td>
+      <td>${rec.payment || ""}</td>
+      <td>${rec.currency || ""}</td>
+      <td>${rec.foreignAmount || ""}</td>
+      <td>${rec.rate || ""}</td>
+      <td>${rec.amount || ""}</td>
+      <td>${rec.memo || ""}</td>
       <td>${rec.fileUrl ? `<a href="${rec.fileUrl}" target="_blank">表示</a>` : ""}</td>
-      <td><button data-idx="${idx}" class="deleteBtn">削除</button></td>
+      <td><button class="btn btn-outline" data-idx="${idx}">削除</button></td>
     `;
     tableBody.appendChild(tr);
   });
 
-  document.querySelectorAll(".deleteBtn").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      const idx = e.target.dataset.idx;
-      const data = JSON.parse(localStorage.getItem("records") || "[]");
-      data.splice(idx, 1);
-      localStorage.setItem("records", JSON.stringify(data));
+  tableBody.querySelectorAll("button[data-idx]").forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      const i = Number(e.currentTarget.dataset.idx);
+      const arr = JSON.parse(localStorage.getItem("records") || "[]");
+      arr.splice(i,1);
+      localStorage.setItem("records", JSON.stringify(arr));
       renderTable();
     });
   });
 }
-
-document.addEventListener("DOMContentLoaded", renderTable);
-
-
-
