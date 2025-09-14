@@ -24,109 +24,92 @@
 
   <!-- 入力（2～3行に収まるコンパクト版） -->
   <section id="tab-input" class="tab-panel active">
-    <form id="entryForm" class="card card-compact">
-      <div class="grid compact">
+    <form id="entryForm" class="grid-form">
+  <!-- 1行目 -->
+  <div>
+    <label>日付
+      <input type="date" id="date" required>
+    </label>
+  </div>
+  <div>
+    <label>使い道
+      <select id="category">
+        <option value="スクリプト購入">スクリプト購入</option>
+        <option value="サーバー代">サーバー代</option>
+        <option value="機材購入">機材購入</option>
+      </select>
+    </label>
+  </div>
+  <div>
+    <label>取引先
+      <select id="otherPreset">
+        <option value="">(選択しない)</option>
+        <option value="Tebex">Tebex</option>
+        <option value="VibeGAMES">VibeGAMES</option>
+        <option value="Ko-fi">Ko-fi</option>
+        <option value="Killstore">Killstore</option>
+        <option value="Etsy">Etsy</option>
+        <option value="FANBOX">FANBOX</option>
+        <option value="ZAP HOSTING">ZAP HOSTING</option>
+      </select>
+      <input type="text" id="otherFree" placeholder="自由入力（任意）">
+    </label>
+  </div>
+  <div>
+    <label>支払方法
+      <select id="payment">
+        <option value="未選択">未選択</option>
+        <option value="銀行振込">銀行振込</option>
+        <option value="クレジットカード">クレジットカード</option>
+        <option value="PayPal">PayPal</option>
+      </select>
+    </label>
+  </div>
 
-        <!-- 1行目 -->
-        <label class="cell">
-          <span>日付</span>
-          <input type="date" id="date" required />
-        </label>
+  <!-- 2行目 -->
+  <div>
+    <label>通貨
+      <select id="currency">
+        <option value="JPY">JPY（日本円）</option>
+        <option value="USD">USD（米ドル）</option>
+        <option value="EUR">EUR（ユーロ）</option>
+      </select>
+    </label>
+  </div>
+  <div>
+    <label>外貨金額
+      <input type="number" step="0.01" id="foreignAmount" placeholder="例: 12.34">
+    </label>
+  </div>
+  <div>
+    <label>為替レート
+      <input type="number" step="0.0001" id="rate" placeholder="1USD=???JPY">
+    </label>
+    <button type="button" id="autoRateBtn">自動取得</button>
+  </div>
+  <div>
+    <label>金額（円）
+      <input type="number" step="1" id="amount" placeholder="自動換算または直接入力">
+    </label>
+  </div>
 
-        <label class="cell">
-          <span>使い道</span>
-          <select id="category">
-            <option value="スクリプト購入">スクリプト購入</option>
-            <option value="サーバー代">サーバー代</option>
-            <option value="機材購入">機材購入</option>
-            <option value="雑費">雑費</option>
-            <option value="FANBOX支援（収益）」>FANBOX支援（収益）</option>
-          </select>
-        </label>
+  <!-- 3行目 -->
+  <div class="wide">
+    <label>メモ
+      <input type="text" id="memo" placeholder="例：MLO/車MOD/サーバー更新など">
+    </label>
+  </div>
+  <div class="wide">
+    <label>ファイル添付（画像/PDF）
+      <input type="file" id="fileInput" accept="image/*,.pdf">
+    </label>
+  </div>
 
-        <!-- その他の内容（プリセット＋自由入力） -->
-        <label class="cell col-2-md">
-          <span>その他の内容</span>
-          <div class="combo-input">
-            <select id="otherPreset" aria-label="その他の内容（プリセット）">
-              <option value="">（選択しない）</option>
-              <option value="Tebex">Tebex</option>
-              <option value="VibeGAMES">VibeGAMES</option>
-              <option value="Ko-fi">Ko-fi</option>
-              <option value="Killstore">Killstore</option>
-              <option value="Etsy">Etsy</option>
-              <option value="FANBOX">FANBOX</option>
-              <option value="ZAP HOSTING">ZAP HOSTING</option>
-            </select>
-            <input type="text" id="otherFree" placeholder="自由入力（任意）" />
-          </div>
-          <!-- 指定の説明行（見やすい1行表示） -->
-          <p class="helper">
-            （選択しない）・Tebex・VibeGAMES・Ko-fi・Killstore・Etsy・FANBOX・ZAP HOSTING ／ 自由入力（任意）
-          </p>
-        </label>
-
-        <label class="cell">
-          <span>支払方法</span>
-          <select id="method">
-            <option value="">未選択</option>
-            <option>PayPal</option>
-            <option>PayPay</option>
-            <option>銀行振込</option>
-            <option>クレカ</option>
-            <option>現金</option>
-          </select>
-        </label>
-
-        <!-- 2行目 -->
-        <label class="cell">
-          <span>通貨</span>
-          <select id="currency">
-            <option value="JPY">JPY（日本円）</option>
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="GBP">GBP</option>
-            <option value="KRW">KRW</option>
-            <option value="CNY">CNY</option>
-          </select>
-        </label>
-
-        <label class="cell">
-          <span>外貨金額</span>
-          <input type="number" id="amountFx" step="0.0001" placeholder="例: 12.34" />
-        </label>
-
-        <label class="cell">
-          <span>為替レート</span>
-          <div class="row nowrap">
-            <input type="number" id="fxRate" step="0.000001" placeholder="1USD=???JPY" />
-            <button type="button" id="autoRateBtn" class="btn chip">自動取得</button>
-          </div>
-        </label>
-
-        <label class="cell">
-          <span>金額（円）</span>
-          <input type="number" id="amount" step="1" placeholder="自動換算または直接入力" />
-        </label>
-
-        <!-- 3行目（必要なら2行目と同一行に収まる） -->
-        <label class="cell col-2">
-          <span>メモ</span>
-          <input type="text" id="memo" placeholder="例：MLO/車MOD/サーバー更新など" />
-        </label>
-
-        <label class="cell col-2">
-          <span>ファイル添付（画像/PDF）</span>
-          <input type="file" id="fileInput" accept="image/*,.pdf" />
-        </label>
-
-      </div>
-
-      <div class="actions sticky-actions">
-        <button type="submit" class="btn btn-primary">保存（Driveへ自動アップロード）</button>
-      </div>
-    </form>
-  </section>
+  <!-- 保存ボタン -->
+  <div class="wide">
+    <button type="submit" class="btn-save">保存（Driveへ自動アップロード）</button>
+  </div>
+</form>
 
   <!-- 一覧 -->
   <section id="tab-list" class="tab-panel">
@@ -204,3 +187,4 @@
   <script src="script.js"></script>
 </body>
 </html>
+
