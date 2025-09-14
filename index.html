@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>会計アプリ雛形</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<button id="loginButton">Googleにログイン</button>
+<p id="loginStatus">未ログイン</p>
+<body>
+  <h1>会計アプリ（ローカル版）</h1>
+
+  <form id="entryForm">
+    <label>日付:
+      <input type="date" id="date" required>
+    </label><br>
+
+    <label>使い道:
+      <select id="category">
+        <option>スクリプト購入</option>
+        <option>サーバー代</option>
+        <option>電子機器</option>
+        <option>雑費</option>
+        <option>収益(FANBOX等)</option>
+        <option>その他</option>
+      </select>
+      <input type="text" id="customCategory" placeholder="その他の内容">
+    </label><br>
+
+    <label>金額:
+      <input type="number" id="amount" required> 円
+    </label><br>
+
+    <label>メモ:
+      <input type="text" id="memo">
+    </label><br>
+
+    <label>ファイル添付:
+      <input type="file" id="fileInput">
+    </label><br><br>
+
+    <button type="submit">保存</button>
+  </form>
+
+  <h2>登録一覧</h2>
+  <table id="recordsTable">
+    <thead>
+      <tr>
+        <th>日付</th>
+        <th>使い道</th>
+        <th>金額</th>
+        <th>メモ</th>
+        <th>ファイル</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script src="script.js"></script>
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>
