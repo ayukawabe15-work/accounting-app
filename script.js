@@ -122,27 +122,49 @@ function recalcJPY(){
   }
 }
 
-// 為替自動取得（exchangerate.host：無料・キー不要）
-autoRateBtn.addEventListener("click", async () => {
-  const ccy = currencyEl.value;
-  if (ccy === "JPY") {
-    alert("通貨がJPYのため為替は不要です。");
-    return;
-  }
-  const date = document.getElementById("date").value || new Date().toISOString().slice(0,10);
-  try{
+/***** 為替レート自動取得（exchangerate.host → 失敗時はer-apiにフォールバック） *****/
+const autoRateBtn = document.getElementById("autoRateBtn");
+if (autoRateBtn) autoRateBtn.addEventListener("click", fetchFxRate);
+
+// グローバル公開（HTMLの onclick からも呼べるように）
+async function fetchFxRate() {
+  try {
+    const ccy = currencyEl.value;
+    if (ccy === "JPY") {
+      alert("通貨がJPYのため為替は不要です。");
+      return;
+    }
+    const date = document.getElementById("date").value || new Date().toISOString().slice(0,10);
+
+    // 1st: 指定日のレート（exchangerate.host）
     // 例: https://api.exchangerate.host/convert?from=USD&to=JPY&date=2025-09-14
-    const url = `https://api.exchangerate.host/convert?from=${encodeURIComponent(ccy)}&to=JPY&date=${date}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if(!data || typeof data.result !== "number") throw new Error("rate not found");
-    fxRateEl.value = data.result.toFixed(6);
+    let rate = null;
+    try {
+      const url1 = `https://api.exchangerate.host/convert?from=${encodeURIComponent(ccy)}&to=JPY&date=${date}`;
+      const r1 = await fetch(url1);
+      const j1 = await r1.json();
+      if (j1 && typeof j1.result === "number") rate = j1.result;
+    } catch (_) {}
+
+    // 2nd: フォールバック（最新レートのみ）
+    if (!rate) {
+      const url2 = `https://open.er-api.com/v6/latest/${encodeURIComponent(ccy)}`;
+      const r2 = await fetch(url2);
+      const j2 = await r2.json();
+      if (j2 && j2.result === "success" && j2.rates && typeof j2.rates.JPY === "number") {
+        rate = j2.rates.JPY;
+      }
+    }
+
+    if (!rate) throw new Error("rate not found");
+
+    fxRateEl.value = Number(rate).toFixed(6);
     recalcJPY();
-  }catch(e){
+  } catch (e) {
     console.error(e);
     alert("為替レートの自動取得に失敗しました。レートを手入力してください。");
   }
-});
+}
 
 /***** 入力フォーム処理（Driveアップロード→登録） *****/
 const form = document.getElementById("entryForm");
@@ -377,3 +399,4 @@ function openPreview(url, name){
 /***** 初期描画 *****/
 renderTable();
 calcAggregates();
+
