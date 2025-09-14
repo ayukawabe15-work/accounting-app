@@ -5,16 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>会計アプリ</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- かわいい系日本語 & 見出し用フォント -->
-　<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Poppins:wght@500;700&display=swap" rel="stylesheet">
-　<!-- アイコン（任意。ボタンの矢印などに使用） -->
-　<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:FILL@1" rel="stylesheet">
+  <!-- かわいい系日本語 & 見出しフォント -->
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Poppins:wght@500;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <header class="topbar">
-    <div class="left">
-      <h1>会計アプリ</h1>
-    </div>
+    <div class="left"><h1>会計アプリ</h1></div>
     <div class="right">
       <button id="loginButton" class="btn">Googleにログイン</button>
       <span id="loginStatus">未ログイン</span>
@@ -31,25 +27,26 @@
   <section id="tab-input" class="tab-panel active">
     <form id="entryForm" class="card">
       <div class="grid">
-        <label>
-          日付
+
+        <label>日付
           <input type="date" id="date" required />
         </label>
 
-        <label>
-          使い道
+        <label>使い道
           <select id="category">
             <option value="スクリプト購入">スクリプト購入</option>
             <option value="サーバー代">サーバー代</option>
             <option value="機材購入">機材購入</option>
             <option value="雑費">雑費</option>
-            <option value="FANBOX支援（収益）">FANBOX支援（収益）</option>
+            <option value="FANBOX支援（収益）」>FANBOX支援（収益）</option>
           </select>
         </label>
 
-      <label for="customCategory">その他の内容</label>
-      <div class="combo-input">
-        <select id="category">
+        <!-- 相手先（プリセット＋自由入力のコンボ） -->
+        <label for="otherFree">相手先</label>
+        <div class="combo-input">
+          <select id="otherPreset" aria-label="相手先プリセット">
+            <option value="">（選択しない）</option>
             <option value="Tebex">Tebex</option>
             <option value="VibeGAMES">VibeGAMES</option>
             <option value="Ko-fi">Ko-fi</option>
@@ -58,11 +55,10 @@
             <option value="FANBOX">FANBOX</option>
             <option value="ZAP HOSTING">ZAP HOSTING</option>
           </select>
-          <input type="text" id="customCategory" placeholder="自由入力（任意）" />
+          <input type="text" id="otherFree" placeholder="自由入力（任意）" />
         </div>
 
-        <label>
-          支払方法
+        <label>支払方法
           <select id="method">
             <option value="">未選択</option>
             <option>PayPal</option>
@@ -73,8 +69,7 @@
           </select>
         </label>
 
-        <label>
-          通貨
+        <label>通貨
           <select id="currency">
             <option value="JPY">JPY（日本円）</option>
             <option value="USD">USD</option>
@@ -85,33 +80,26 @@
           </select>
         </label>
 
-        <label>
-          外貨金額
+        <label>外貨金額
           <input type="number" id="amountFx" step="0.0001" placeholder="例: 12.34" />
         </label>
 
-        <label>
-          為替レート
+        <label>為替レート
           <div class="row">
             <input type="number" id="fxRate" step="0.000001" placeholder="1USD=???JPY" />
-            <button type="button" id="autoRateBtn">
-             自動<br>取得
-            </button>
+            <button type="button" id="autoRateBtn" class="btn chip">自動取得</button>
           </div>
         </label>
 
-        <label>
-          金額（円）
+        <label>金額（円）
           <input type="number" id="amount" step="1" placeholder="自動換算または直接入力" />
         </label>
 
-        <label class="col-2">
-          メモ
+        <label class="col-2">メモ
           <input type="text" id="memo" placeholder="例：MLO/車MOD/サーバー更新など" />
         </label>
 
-        <label class="col-2">
-          ファイル添付（画像/PDF）
+        <label class="col-2">ファイル添付（画像/PDF）
           <input type="file" id="fileInput" accept="image/*,.pdf" />
         </label>
       </div>
@@ -125,18 +113,10 @@
   <!-- 一覧 -->
   <section id="tab-list" class="tab-panel">
     <div class="card filters">
-      <label>年月
-        <input type="month" id="filterMonth" />
-      </label>
-      <label>使い道
-        <input type="text" id="filterCategory" placeholder="完全一致で絞り込み" />
-      </label>
-      <label>支払方法
-        <input type="text" id="filterMethod" placeholder="完全一致で絞り込み" />
-      </label>
-      <label>キーワード
-        <input type="text" id="filterText" placeholder="使い道/メモを検索" />
-      </label>
+      <label>年月<input type="month" id="filterMonth" /></label>
+      <label>使い道<input type="text" id="filterCategory" placeholder="完全一致で絞り込み" /></label>
+      <label>支払方法<input type="text" id="filterMethod" placeholder="完全一致で絞り込み" /></label>
+      <label>キーワード<input type="text" id="filterText" placeholder="使い道/相手先/メモを検索" /></label>
       <button id="clearFilters" class="btn">クリア</button>
       <button id="exportCSV" class="btn">CSV出力</button>
     </div>
@@ -150,6 +130,7 @@
             <th>区分</th>
             <th>金額(JPY)</th>
             <th>外貨</th>
+            <th>相手先</th>
             <th>支払方法</th>
             <th>メモ</th>
             <th>添付</th>
@@ -165,35 +146,19 @@
   <section id="tab-agg" class="tab-panel">
     <div class="card">
       <div class="row">
-        <label>月次
-          <input type="month" id="aggMonth" />
-        </label>
-        <label>年次
-          <input type="number" id="aggYear" min="2000" max="2100" />
-        </label>
+        <label>月次<input type="month" id="aggMonth" /></label>
+        <label>年次<input type="number" id="aggYear" min="2000" max="2100" /></label>
         <button id="recalc" class="btn">再計算</button>
       </div>
 
       <div class="grid grid-3">
-        <div class="summary-box">
-          <div class="label">月次 収入</div><div id="mIncome" class="val">-</div>
-        </div>
-        <div class="summary-box">
-          <div class="label">月次 経費</div><div id="mExpense" class="val">-</div>
-        </div>
-        <div class="summary-box">
-          <div class="label">月次 収支</div><div id="mNet" class="val">-</div>
-        </div>
+        <div class="summary-box"><div class="label">月次 収入</div><div id="mIncome" class="val">-</div></div>
+        <div class="summary-box"><div class="label">月次 経費</div><div id="mExpense" class="val">-</div></div>
+        <div class="summary-box"><div class="label">月次 収支</div><div id="mNet" class="val">-</div></div>
 
-        <div class="summary-box">
-          <div class="label">年次 収入</div><div id="yIncome" class="val">-</div>
-        </div>
-        <div class="summary-box">
-          <div class="label">年次 経費</div><div id="yExpense" class="val">-</div>
-        </div>
-        <div class="summary-box">
-          <div class="label">年次 収支</div><div id="yNet" class="val">-</div>
-        </div>
+        <div class="summary-box"><div class="label">年次 収入</div><div id="yIncome" class="val">-</div></div>
+        <div class="summary-box"><div class="label">年次 経費</div><div id="yExpense" class="val">-</div></div>
+        <div class="summary-box"><div class="label">年次 収支</div><div id="yNet" class="val">-</div></div>
       </div>
 
       <h3>月別内訳</h3>
@@ -221,8 +186,3 @@
   <script src="script.js"></script>
 </body>
 </html>
-
-
-
-
-
