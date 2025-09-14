@@ -198,6 +198,8 @@ form.addEventListener("submit", async (e) => {
   const date = document.getElementById("date").value;
   const category = document.getElementById("category").value;
   const customCategory = document.getElementById("customCategory").value.trim();
+  // カテゴリの決定（自由入力が優先）
+  const finalCategory = customCategory ? customCategory : category;
   const method = document.getElementById("method").value;
 
   const currency = currencyEl.value || "JPY";
@@ -471,3 +473,4 @@ document.getElementById("recordsTable").addEventListener("click", async (e) => {
   renderTable();
   calcAggregates();
 });
+
