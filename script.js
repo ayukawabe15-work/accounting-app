@@ -9,112 +9,128 @@ let gisInited = false;
 const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
-// gapi 読み込み完了で呼ばれる（index.html の onload から）
+// === gapi 読み込み完了 ===
 function gapiLoaded() {
+  console.log("[auth] gapiLoaded()");
   try {
-    gapi.load("client", initializeGapiClient);
+    gapi.load("client", async () => {
+      try {
+        await gapi.client.init({});
+        await gapi.client.load("drive", "v3");
+        gapiInited = true;
+        console.log("[auth] gapi initialized");
+        maybeEnableLogin();
+      } catch (e) {
+        console.error("[auth] gapi init error:", e);
+        alert("Google API の初期化に失敗しました。コンソールを確認してください。");
+      }
+    });
   } catch (e) {
-    console.error("gapiLoaded error:", e);
+    console.error("[auth] gapiLoaded wrapper error:", e);
   }
 }
 
-async function initializeGapiClient() {
-  try {
-    await gapi.client.init({});
-    await gapi.client.load("drive", "v3"); // Drive の discovery をロード
-    gapiInited = true;
-    maybeEnableLogin();
-  } catch (e) {
-    console.error("initializeGapiClient error:", e);
-  }
-}
-
-// GIS 読み込み完了で呼ばれる（index.html の onload から）
+// === GIS 読み込み完了 ===
 function gisLoaded() {
+  console.log("[auth] gisLoaded()");
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
+      // 初回のレスポンス
       callback: (resp) => {
-        if (resp.error) {
-          console.error(resp);
-          alert("Google 連携でエラーが発生しました。");
-          return;
+        console.log("[auth] token callback:", resp);
+        if (resp && resp.access_token) {
+          if (loginStatus) loginStatus.textContent = "ログイン済み";
+        } else if (resp && resp.error) {
+          alert("Google 認証でエラーが発生しました: " + resp.error);
+          console.error("[auth] token error:", resp);
         }
-        if (loginStatus) loginStatus.textContent = "ログイン済み";
       },
     });
     gisInited = true;
+    console.log("[auth] GIS initialized");
     maybeEnableLogin();
   } catch (e) {
-    console.error("gisLoaded error:", e);
+    console.error("[auth] gisLoaded error:", e);
   }
 }
 
-// ★ 元の仕様：gapi と GIS が両方 ready になったらボタンを有効化
+// === 両方 ready になったらボタンを解放 ===
 function maybeEnableLogin() {
-  if (gapiInited && gisInited && loginBtn) {
+  if (!loginBtn) return;
+  if (gapiInited && gisInited) {
     loginBtn.disabled = false;
     loginBtn.classList.remove("is-disabled");
+    console.log("[auth] login button enabled");
   }
 }
 
-// ログインボタン
+// === ログインボタン ===
 if (loginBtn) {
-  loginBtn.addEventListener("click", () => {
+  loginBtn.addEventListener("click", (ev) => {
+    ev.preventDefault(); // フォーム内にあっても送信させない
+    console.log("[auth] login clicked");
+
     if (!tokenClient) {
-      alert("Google ライブラリの読み込み待機中です。少し待って再度お試しください。");
+      alert("Google ライブラリの読み込み待機中です。数秒後に再実行してください。");
       return;
     }
-    tokenClient.requestAccessToken({ prompt: "" }); // 既存許可なら無言取得
+
+    // 最初は consent を必ず出す（invalid_client や許可ミスを目で確認できる）
+    const firstTime = !gapi.client.getToken();
+    try {
+      tokenClient.requestAccessToken({
+        prompt: firstTime ? "consent" : "",
+      });
+    } catch (e) {
+      // ポップアップブロック時など
+      console.error("[auth] requestAccessToken error:", e);
+      alert("ポップアップがブロックされた可能性があります。別タブで開く・拡張機能を無効化して再試行してください。");
+    }
   });
 }
 
-/** Drive アップロード（従来前提: gapi は既にロード済み） */
+/** Drive アップロードのユーティリティ（既存と置換OK） */
 async function uploadToDrive(file) {
   if (!file) return null;
 
-  // アクセストークンが無い場合は事前にログインしてもらう
+  // アクセストークンが無い場合は先に認証
   if (!gapi.client.getToken()) {
     alert("Drive にアップロードするには Google にログインしてください。");
     return null;
   }
 
-  const metadata = {
-    name: file.name,
-    mimeType: file.type || "application/octet-stream",
-  };
-  const boundary = "-------314159265358979323846";
-  const delimiter = "\r\n--" + boundary + "\r\n";
-  const closeDelimiter = "\r\n--" + boundary + "--";
-
-  const reader = await file.arrayBuffer();
-  const base64Data = btoa(String.fromCharCode(...new Uint8Array(reader)));
-  const multipartRequestBody =
-    delimiter +
-    "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
-    JSON.stringify(metadata) +
-    delimiter +
-    "Content-Type: " + (file.type || "application/octet-stream") + "\r\n" +
-    "Content-Transfer-Encoding: base64\r\n\r\n" +
-    base64Data +
-    closeDelimiter;
-
   try {
+    const metadata = { name: file.name, mimeType: file.type || "application/octet-stream" };
+    const boundary = "-------314159265358979323846";
+    const delimiter = "\r\n--" + boundary + "\r\n";
+    const closeDelimiter = "\r\n--" + boundary + "--";
+    const buf = await file.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+
+    const body =
+      delimiter +
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      JSON.stringify(metadata) +
+      delimiter +
+      "Content-Type: " + (file.type || "application/octet-stream") + "\r\n" +
+      "Content-Transfer-Encoding: base64\r\n\r\n" +
+      base64 +
+      closeDelimiter;
+
     const res = await gapi.client.request({
       path: "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
       method: "POST",
-      headers: {
-        "Content-Type": "multipart/related; boundary=" + boundary,
-      },
-      body: multipartRequestBody,
+      headers: { "Content-Type": "multipart/related; boundary=" + boundary },
+      body,
     });
-    // 共有リンクを返す（必要なら共有設定 API 呼び出しを追加）
-    const fileId = res.result.id;
-    return `https://drive.google.com/file/d/${fileId}/view`;
+
+    const id = res.result.id;
+    return `https://drive.google.com/file/d/${id}/view`;
   } catch (e) {
-    console.error("uploadToDrive error:", e);
-    alert("Drive へのアップロードに失敗しました。");
+    console.error("[drive] upload error:", e);
+    alert("Drive アップロードに失敗しました。コンソールを確認してください。");
     return null;
   }
 }
@@ -369,6 +385,7 @@ form?.addEventListener("submit", async (e) => {
   const dd = String(d.getDate()).padStart(2, "0");
   if (dateEl) dateEl.value = `${yyyy}-${mm}-${dd}`;
 })();
+
 
 
 
