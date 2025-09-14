@@ -88,3 +88,12 @@ html,body{ margin:0; padding:0; background:var(--bg); color:var(--text); font-fa
   .actions{ justify-content:stretch; }
   .btn-primary{ width:100%; }
 }
+
+.combo {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+.combo .w100 { width: 100%; }
+.login-btn.is-disabled { opacity: .6; pointer-events: none; }
+.hint { color:#b88; font-size:12px; }
