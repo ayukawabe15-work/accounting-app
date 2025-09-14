@@ -237,3 +237,6 @@ function openPreview(url, name){
 renderTable();
 calcAggregates();
 
+// ライブラリが先に読み込まれているので、ここで初期化OK
+if (typeof gapiLoaded === "function") gapiLoaded();
+if (typeof gisLoaded === "function") gisLoaded();
