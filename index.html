@@ -50,6 +50,15 @@
         <label>
           その他の内容（任意）
           <input type="text" id="customCategory" placeholder="自由入力" />
+        <select id="category">
+            <option value="Tebex">Tebex</option>
+            <option value="VibeGAMES">VibeGAMES</option>
+            <option value="Ko-fi">Ko-fi</option>
+            <option value="Killstore">Killstore</option>
+            <option value="Etsy">Etsy</option>
+            <option value="FANBOX">FANBOX</option>
+            <option value="ZAP HOSTING">ZAP HOSTING</option>
+          </select>
         </label>
 
         <label>
@@ -85,7 +94,9 @@
           為替レート
           <div class="row">
             <input type="number" id="fxRate" step="0.000001" placeholder="1USD=???JPY" />
-            <button type="button" id="autoRateBtn" class="btn" onclick="fetchFxRate()">自動取得</button>
+            <button type="button" id="autoRateBtn">
+             自動<br>取得
+            </button>
           </div>
         </label>
 
@@ -210,4 +221,5 @@
   <script src="script.js"></script>
 </body>
 </html>
+
 
