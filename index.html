@@ -81,7 +81,7 @@
         <label>為替レート（1 通貨 → JPY）
           <div style="display:flex;gap:8px">
             <input type="number" id="fxRate" min="0" step="0.0001" placeholder="例）USD→JPY 151.23" />
-            <button type="button" id="autoRateBtn">自動取得</button>
+            <button type="button" id="autoRateBtn" onclick="fetchFxRate()">自動取得</button>
           </div>
         </label>
         <!-- ▲ 多通貨対応エリア -->
@@ -204,3 +204,4 @@
   <script src="script.js"></script>
 </body>
 </html>
+
