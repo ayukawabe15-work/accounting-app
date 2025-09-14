@@ -37,6 +37,19 @@ h1{font-family:"Poppins",sans-serif;font-weight:700;letter-spacing:.3px}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
 .grid.compact{gap:.75rem}
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem}
+.grid-form {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.grid-form .wide {
+  grid-column: span 4;
+}
+#autoRateBtn {
+  white-space: nowrap;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+}
 .cell{display:flex;flex-direction:column;gap:.35rem}
 .col-2{grid-column:span 2}
 .col-2-md{grid-column:span 2}
@@ -87,3 +100,4 @@ input[type="file"]{padding:.45rem .6rem;background:var(--panel-2)}
 
 /* Login chip */
 #loginStatus{margin-left:.55rem;padding:.2rem .55rem;border-radius:999px;background:#fff;border:1px solid var(--line);color:#b73a6e;font-weight:700}
+
