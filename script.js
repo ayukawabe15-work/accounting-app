@@ -328,7 +328,9 @@ function renderTable(){
     const fxCell = (r.currency && r.currency!=="JPY")
       ? `${r.currency} ${Number(r.amountFx).toLocaleString(undefined,{maximumFractionDigits:4})} @ ${Number(r.fxRate).toLocaleString(undefined,{maximumFractionDigits:6})}`
       : "";
-    const linkHtml = r.fileUrl ? `<a href="${r.fileUrl}" target="_blank" data-preview="${r.fileUrl}" data-name="${r.fileName}" class="preview-link">${r.fileName||"開く"}</a>` : "";
+    const linkHtml = r.fileUrl
+  ? `<a href="${r.fileUrl}" target="_blank" data-preview="${r.previewUrl || r.fileUrl}" data-name="${r.fileName}" class="preview-link">${r.fileName||"開く"}</a>`
+  : "";
     tr.innerHTML = `
       <td>${r.date}</td>
       <td>${r.category}</td>
@@ -352,7 +354,9 @@ function renderTable(){
     const fxCell = (r.currency && r.currency!=="JPY")
       ? `${r.currency} ${Number(r.amountFx).toLocaleString(undefined,{maximumFractionDigits:4})} @ ${Number(r.fxRate).toLocaleString(undefined,{maximumFractionDigits:6})}`
       : "";
-    const linkHtml = r.fileUrl ? `<a href="${r.fileUrl}" target="_blank" data-preview="${r.fileUrl}" data-name="${r.fileName}" class="preview-link">${r.fileName||"開く"}</a>` : "";
+    const linkHtml = r.fileUrl
+  ? `<a href="${r.fileUrl}" target="_blank" data-preview="${r.previewUrl || r.fileUrl}" data-name="${r.fileName}" class="preview-link">${r.fileName||"開く"}</a>`
+  : "";
     tr.innerHTML = `
       <td>${r.date}</td>
       <td>${r.category}</td>
@@ -545,6 +549,7 @@ document.getElementById("recordsTable").addEventListener("click", async (e) => {
   renderTable();
   calcAggregates();
 });
+
 
 
 
