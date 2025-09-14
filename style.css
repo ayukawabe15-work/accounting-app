@@ -101,3 +101,6 @@ input[type="file"]{padding:.45rem .6rem;background:var(--panel-2)}
 /* Login chip */
 #loginStatus{margin-left:.55rem;padding:.2rem .55rem;border-radius:999px;background:#fff;border:1px solid var(--line);color:#b73a6e;font-weight:700}
 
+.hidden {
+  display: none;
+}
