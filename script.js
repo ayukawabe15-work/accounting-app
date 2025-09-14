@@ -1,21 +1,85 @@
-// ===== Google Drive 連携用 =====
+/***** Google Drive 連携セットアップ（堅牢版） *****/
 const CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com";
-const SCOPES = "https://www.googleapis.com/auth/drive.file"; // 自分が作成した/アプリが作成したファイルのみ操作
+const SCOPES = "https://www.googleapis.com/auth/drive.file";
 
-let tokenClient;
-function gapiLoaded(){ gapi.load("client", async () => {
-  await gapi.client.init({ discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] });
-});}
-function gisLoaded(){
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID, scope: SCOPES,
-    callback: (resp) => {
-      if(resp.error) { console.error(resp); return; }
-      document.getElementById("loginStatus").innerText = "ログイン済み";
+let tokenClient = null;
+let gapiReady = false;
+let gisReady = false;
+
+// UI: 準備できるまでログインボタンを無効化
+const loginBtn = document.getElementById("loginButton");
+const statusEl = document.getElementById("loginStatus");
+if (loginBtn) { loginBtn.disabled = true; loginBtn.title = "読み込み中…"; }
+
+function setReady() {
+  if (gapiReady && gisReady) {
+    if (loginBtn) { loginBtn.disabled = false; loginBtn.title = ""; }
+  }
+}
+
+// 1) gapi(client) 初期化
+async function gapiLoaded() {
+  try {
+    await new Promise((resolve) => gapi.load("client", resolve));
+    await gapi.client.init({
+      discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+    });
+    gapiReady = true;
+    setReady();
+    console.log("[APP] gapi client ready");
+  } catch (e) {
+    console.error("[APP] gapi init failed", e);
+  }
+}
+
+// 2) Google Identity Services 初期化
+function gisLoaded() {
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (resp) => {
+        if (resp.error) { console.error(resp); return; }
+        statusEl.textContent = "ログイン済み";
+      },
+    });
+    gisReady = true;
+    setReady();
+    console.log("[APP] tokenClient initialized");
+  } catch (e) {
+    console.error("[APP] gis init failed", e);
+  }
+}
+
+// 3) クリック時（準備できていないときは分かりやすく通知）
+if (loginBtn) {
+  loginBtn.onclick = () => {
+    if (!tokenClient) {
+      alert("まだ準備中です。数秒後に再度お試しください。");
+      console.warn("[APP] tokenClient is not ready yet");
+      return;
     }
+    tokenClient.requestAccessToken();
+  };
+}
+
+// 4) ページ読み込み後、外部SDKの読み込み完了を待つ（index.htmlでonload属性が無くても動く）
+window.addEventListener("load", async () => {
+  await waitFor(() => window.gapi && typeof gapi.load === "function");
+  await gapiLoaded();
+  await waitFor(() => window.google && google.accounts && google.accounts.oauth2);
+  gisLoaded();
+});
+
+function waitFor(cond, timeoutMs = 10000, intervalMs = 100) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const timer = setInterval(() => {
+      if (cond()) { clearInterval(timer); resolve(); }
+      else if (Date.now() - start > timeoutMs) { clearInterval(timer); reject(new Error("timeout")); }
+    }, intervalMs);
   });
 }
-document.getElementById("loginButton").onclick = () => tokenClient && tokenClient.requestAccessToken();
 
 /***** タブ切替 *****/
 document.querySelectorAll(".tab").forEach(btn=>{
@@ -212,7 +276,7 @@ function setText(id,txt){ document.getElementById(id).innerText = txt; }
 function bindPreviewLinks(){
   document.querySelectorAll("a.preview-link").forEach(a=>{
     a.addEventListener("click",(e)=>{
-      // 通常の新規タブも使えるように、Ctrl/中クリックは素通し
+      // Ctrl/⌘クリックや中クリックは新規タブを優先
       if(e.ctrlKey || e.metaKey || e.button===1) return;
       e.preventDefault();
       openPreview(a.dataset.preview, a.dataset.name);
@@ -220,12 +284,12 @@ function bindPreviewLinks(){
   });
 }
 const modal = document.getElementById("previewModal");
-document.getElementById("closePreview").onclick = ()=>modal.close();
+const closeBtn = document.getElementById("closePreview");
+if (closeBtn) closeBtn.onclick = ()=>modal.close();
 
 function openPreview(url, name){
   const cont = document.getElementById("previewContainer");
   cont.innerHTML = "";
-  // Driveの /view リンク → 画像/PDFなら iframe で表示（CORSの関係でサムネイル扱い）
   const iframe = document.createElement("iframe");
   iframe.src = url;
   iframe.title = name||"preview";
@@ -236,7 +300,3 @@ function openPreview(url, name){
 /***** 初期描画 *****/
 renderTable();
 calcAggregates();
-
-// ライブラリが先に読み込まれているので、ここで初期化OK
-if (typeof gapiLoaded === "function") gapiLoaded();
-if (typeof gisLoaded === "function") gisLoaded();
