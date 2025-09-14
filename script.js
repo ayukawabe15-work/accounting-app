@@ -1,5 +1,5 @@
 // ===== Google Drive 連携用 =====
-const CLIENT_ID = "👉ここにあなたのクライアントIDを貼り付け👈";
+const CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com";
 const API_KEY = ""; // 今回は不要
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
 
@@ -110,3 +110,4 @@ form.addEventListener("submit", async (e) => {
 
   form.reset();
 });
+
