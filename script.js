@@ -26,9 +26,7 @@ function gisLoaded() {
     client_id: CLIENT_ID,
     scope: SCOPES,
     callback: (resp) => {
-      if (resp.error !== undefined) {
-        throw (resp);
-      }
+      if (resp.error) throw resp;
       accessToken = resp.access_token;
       document.getElementById("loginStatus").innerText = "ログイン済み";
     },
@@ -42,179 +40,124 @@ document.getElementById("loginButton").onclick = () => {
   }
 };
 
-/***** データ保存処理 *****/
-const form = document.getElementById("entryForm");
-const tableBody = document.querySelector("#recordsTable tbody");
-
-let records = JSON.parse(localStorage.getItem("records") || "[]");
-
-function saveRecords() {
-  localStorage.setItem("records", JSON.stringify(records));
-}
-
-/***** Driveアップロード *****/
-async function uploadFile(file) {
-  if (!accessToken) {
-    alert("Googleにログインしてください");
-    return null;
-  }
-  const metadata = {
-    name: file.name,
-    mimeType: file.type,
-  };
-  const formData = new FormData();
-  formData.append(
-    "metadata",
-    new Blob([JSON.stringify(metadata)], { type: "application/json" })
-  );
-  formData.append("file", file);
-
-  const res = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
-    {
-      method: "POST",
-      headers: new Headers({ Authorization: "Bearer " + accessToken }),
-      body: formData,
-    }
-  );
-  const data = await res.json();
-  if (data.id) {
-    return {
-      fileId: data.id,
-      fileUrl: `https://drive.google.com/file/d/${data.id}/view`,
-      previewUrl: `https://drive.google.com/file/d/${data.id}/preview`,
-    };
-  }
-  return null;
-}
-
-/***** テーブル描画 *****/
-function renderTable() {
-  tableBody.innerHTML = "";
-  records.forEach((r, idx) => {
-    const row = document.createElement("tr");
-    const linkHtml = r.fileUrl
-      ? `<a href="${r.fileUrl}" target="_blank" data-preview="${r.previewUrl}" class="preview-link">${r.fileName || "開く"}</a>`
-      : "";
-
-    row.innerHTML = `
-      <td>${r.date}</td>
-      <td>${r.category}</td>
-      <td>${r.amount}</td>
-      <td>${r.memo}</td>
-      <td>${r.other || ""}</td>
-      <td>${linkHtml}</td>
-      <td><button class="delete-btn" data-idx="${idx}">削除</button></td>
-    `;
-    tableBody.appendChild(row);
-  });
-}
-renderTable();
-
-/***** 削除処理 *****/
-tableBody.addEventListener("click", async (e) => {
-  if (e.target.classList.contains("delete-btn")) {
-    const idx = e.target.dataset.idx;
-    if (confirm("削除してよろしいですか？")) {
-      const fileId = records[idx].fileId;
-      if (fileId && accessToken) {
-        try {
-          await gapi.client.drive.files.delete({ fileId: fileId });
-        } catch (err) {
-          console.error("Drive削除エラー", err);
-        }
+/***** 為替レート自動取得 *****/
+document.addEventListener("DOMContentLoaded", () => {
+  const autoBtn = document.getElementById("autoRateBtn");
+  if (autoBtn) {
+    autoBtn.addEventListener("click", async () => {
+      const currency = document.getElementById("currency").value;
+      if (currency === "JPY") {
+        alert("JPYの場合は不要です");
+        return;
       }
-      records.splice(idx, 1);
-      saveRecords();
-      renderTable();
-    }
+      try {
+        const res = await fetch(`https://open.er-api.com/v6/latest/${currency}`);
+        const data = await res.json();
+        if (data.result === "success" && data.rates.JPY) {
+          const rate = data.rates.JPY;
+          document.getElementById("rate").value = `1${currency}=${rate.toFixed(2)}JPY`;
+          const fAmt = parseFloat(document.getElementById("foreignAmount").value || "0");
+          if (fAmt) {
+            document.getElementById("amount").value = (fAmt * rate).toFixed(0);
+          }
+        } else {
+          alert("為替レートの取得に失敗しました");
+        }
+      } catch (e) {
+        alert("APIエラー: " + e.message);
+      }
+    });
   }
 });
 
-/***** フォーム送信 *****/
+/***** データ保存 *****/
+const form = document.getElementById("entryForm");
+const tableBody = document.querySelector("#recordsTable tbody");
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const date = document.getElementById("date").value;
-  const category = document.getElementById("category").value;
-  const customCategory = document.getElementById("customCategory").value.trim();
-  const amount = document.getElementById("amount").value;
-  const memo = document.getElementById("memo").value;
-  const other = document.getElementById("otherFree").value.trim();
-  const fileInput = document.getElementById("fileInput");
-
-  const finalCategory = customCategory ? customCategory : category;
-
-  let fileData = {};
-  if (fileInput.files.length > 0) {
-    fileData = await uploadFile(fileInput.files[0]) || {};
-    fileData.fileName = fileInput.files[0].name;
-  }
 
   const rec = {
-    date,
-    category: finalCategory,
-    amount,
-    memo,
-    other,
-    ...fileData,
+    date: document.getElementById("date").value,
+    type: document.getElementById("type").value,
+    category: document.getElementById("category").value,
+    partner: document.getElementById("partner").value,
+    payment: document.getElementById("payment").value,
+    currency: document.getElementById("currency").value,
+    foreignAmount: document.getElementById("foreignAmount").value,
+    rate: document.getElementById("rate").value,
+    amount: document.getElementById("amount").value,
+    memo: document.getElementById("memo").value,
+    fileId: null,
+    fileUrl: null
   };
 
-  records.push(rec);
-  saveRecords();
+  const fileInput = document.getElementById("fileInput");
+  if (fileInput.files.length > 0 && accessToken) {
+    const file = fileInput.files[0];
+    const metadata = { name: file.name, mimeType: file.type };
+    const formData = new FormData();
+    formData.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+    formData.append("file", file);
+
+    const uploadRes = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+      {
+        method: "POST",
+        headers: { Authorization: "Bearer " + accessToken },
+        body: formData
+      }
+    );
+    const result = await uploadRes.json();
+    rec.fileId = result.id;
+    rec.fileUrl = `https://drive.google.com/file/d/${result.id}/view`;
+  }
+
+  saveRecord(rec);
   renderTable();
   form.reset();
 });
 
-/***** CSVエクスポート *****/
-document.getElementById("exportCsv").addEventListener("click", () => {
-  let csv = "日付,使い道,金額,メモ,その他の内容,ファイルURL\n";
-  records.forEach((r) => {
-    csv += `${r.date},${r.category},${r.amount},${r.memo},${r.other || ""},${r.fileUrl || ""}\n`;
-  });
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "records.csv";
-  a.click();
-});
-
-/***** 為替レート取得（autoRateBtn対応） *****/
-async function fetchExchangeRate(base, target) {
-  try {
-    let res = await fetch(`https://api.exchangerate.host/latest?base=${base}&symbols=${target}`);
-    if (res.ok) {
-      let data = await res.json();
-      if (data.rates && data.rates[target]) {
-        return data.rates[target];
-      }
-    }
-    // フォールバック
-    res = await fetch(`https://open.er-api.com/v6/latest/${base}`);
-    if (res.ok) {
-      let data = await res.json();
-      if (data.rates && data.rates[target]) {
-        return data.rates[target];
-      }
-    }
-    return null;
-  } catch (e) {
-    console.error(e);
-    return null;
-  }
+function saveRecord(rec) {
+  const data = JSON.parse(localStorage.getItem("records") || "[]");
+  data.push(rec);
+  localStorage.setItem("records", JSON.stringify(data));
 }
 
-document.getElementById("autoRateBtn").addEventListener("click", async () => {
-  const base = document.getElementById("currency").value;
-  const target = "JPY";
-  const rate = await fetchExchangeRate(base, target);
-  if (rate) {
-    document.getElementById("rate").value = rate.toFixed(4);
-  } else {
-    alert("為替レートの自動取得に失敗しました。手動入力してください。");
-  }
-});
+function renderTable() {
+  tableBody.innerHTML = "";
+  const data = JSON.parse(localStorage.getItem("records") || "[]");
+  data.forEach((rec, idx) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${rec.date}</td>
+      <td>${rec.type}</td>
+      <td>${rec.category}</td>
+      <td>${rec.partner}</td>
+      <td>${rec.payment}</td>
+      <td>${rec.currency}</td>
+      <td>${rec.foreignAmount}</td>
+      <td>${rec.rate}</td>
+      <td>${rec.amount}</td>
+      <td>${rec.memo}</td>
+      <td>${rec.fileUrl ? `<a href="${rec.fileUrl}" target="_blank">表示</a>` : ""}</td>
+      <td><button data-idx="${idx}" class="deleteBtn">削除</button></td>
+    `;
+    tableBody.appendChild(tr);
+  });
 
+  document.querySelectorAll(".deleteBtn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const idx = e.target.dataset.idx;
+      const data = JSON.parse(localStorage.getItem("records") || "[]");
+      data.splice(idx, 1);
+      localStorage.setItem("records", JSON.stringify(data));
+      renderTable();
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", renderTable);
 
 
 
