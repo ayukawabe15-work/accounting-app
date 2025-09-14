@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>会計アプリ</title>
   <link rel="stylesheet" href="style.css" />
-  <!-- かわいい系日本語 & 見出しフォント -->
   <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Poppins:wght@500;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -23,16 +22,19 @@
     <button class="tab" data-target="tab-agg">集計</button>
   </nav>
 
-  <!-- 入力 -->
+  <!-- 入力（2～3行に収まるコンパクト版） -->
   <section id="tab-input" class="tab-panel active">
-    <form id="entryForm" class="card">
-      <div class="grid">
+    <form id="entryForm" class="card card-compact">
+      <div class="grid compact">
 
-        <label>日付
+        <!-- 1行目 -->
+        <label class="cell">
+          <span>日付</span>
           <input type="date" id="date" required />
         </label>
 
-        <label>使い道
+        <label class="cell">
+          <span>使い道</span>
           <select id="category">
             <option value="スクリプト購入">スクリプト購入</option>
             <option value="サーバー代">サーバー代</option>
@@ -42,23 +44,30 @@
           </select>
         </label>
 
-        <!-- 相手先（プリセット＋自由入力のコンボ） -->
-        <label for="otherFree">相手先</label>
-        <div class="combo-input">
-          <select id="otherPreset" aria-label="相手先プリセット">
-            <option value="">（選択しない）</option>
-            <option value="Tebex">Tebex</option>
-            <option value="VibeGAMES">VibeGAMES</option>
-            <option value="Ko-fi">Ko-fi</option>
-            <option value="Killstore">Killstore</option>
-            <option value="Etsy">Etsy</option>
-            <option value="FANBOX">FANBOX</option>
-            <option value="ZAP HOSTING">ZAP HOSTING</option>
-          </select>
-          <input type="text" id="otherFree" placeholder="自由入力（任意）" />
-        </div>
+        <!-- その他の内容（プリセット＋自由入力） -->
+        <label class="cell col-2-md">
+          <span>その他の内容</span>
+          <div class="combo-input">
+            <select id="otherPreset" aria-label="その他の内容（プリセット）">
+              <option value="">（選択しない）</option>
+              <option value="Tebex">Tebex</option>
+              <option value="VibeGAMES">VibeGAMES</option>
+              <option value="Ko-fi">Ko-fi</option>
+              <option value="Killstore">Killstore</option>
+              <option value="Etsy">Etsy</option>
+              <option value="FANBOX">FANBOX</option>
+              <option value="ZAP HOSTING">ZAP HOSTING</option>
+            </select>
+            <input type="text" id="otherFree" placeholder="自由入力（任意）" />
+          </div>
+          <!-- 指定の説明行（見やすい1行表示） -->
+          <p class="helper">
+            （選択しない）・Tebex・VibeGAMES・Ko-fi・Killstore・Etsy・FANBOX・ZAP HOSTING ／ 自由入力（任意）
+          </p>
+        </label>
 
-        <label>支払方法
+        <label class="cell">
+          <span>支払方法</span>
           <select id="method">
             <option value="">未選択</option>
             <option>PayPal</option>
@@ -69,7 +78,9 @@
           </select>
         </label>
 
-        <label>通貨
+        <!-- 2行目 -->
+        <label class="cell">
+          <span>通貨</span>
           <select id="currency">
             <option value="JPY">JPY（日本円）</option>
             <option value="USD">USD</option>
@@ -80,31 +91,38 @@
           </select>
         </label>
 
-        <label>外貨金額
+        <label class="cell">
+          <span>外貨金額</span>
           <input type="number" id="amountFx" step="0.0001" placeholder="例: 12.34" />
         </label>
 
-        <label>為替レート
-          <div class="row">
+        <label class="cell">
+          <span>為替レート</span>
+          <div class="row nowrap">
             <input type="number" id="fxRate" step="0.000001" placeholder="1USD=???JPY" />
             <button type="button" id="autoRateBtn" class="btn chip">自動取得</button>
           </div>
         </label>
 
-        <label>金額（円）
+        <label class="cell">
+          <span>金額（円）</span>
           <input type="number" id="amount" step="1" placeholder="自動換算または直接入力" />
         </label>
 
-        <label class="col-2">メモ
+        <!-- 3行目（必要なら2行目と同一行に収まる） -->
+        <label class="cell col-2">
+          <span>メモ</span>
           <input type="text" id="memo" placeholder="例：MLO/車MOD/サーバー更新など" />
         </label>
 
-        <label class="col-2">ファイル添付（画像/PDF）
+        <label class="cell col-2">
+          <span>ファイル添付（画像/PDF）</span>
           <input type="file" id="fileInput" accept="image/*,.pdf" />
         </label>
+
       </div>
 
-      <div class="actions">
+      <div class="actions sticky-actions">
         <button type="submit" class="btn btn-primary">保存（Driveへ自動アップロード）</button>
       </div>
     </form>
@@ -116,13 +134,15 @@
       <label>年月<input type="month" id="filterMonth" /></label>
       <label>使い道<input type="text" id="filterCategory" placeholder="完全一致で絞り込み" /></label>
       <label>支払方法<input type="text" id="filterMethod" placeholder="完全一致で絞り込み" /></label>
-      <label>キーワード<input type="text" id="filterText" placeholder="使い道/相手先/メモを検索" /></label>
+      <label>キーワード
+        <input type="text" id="filterText" placeholder="使い道/その他の内容/メモを検索" />
+      </label>
       <button id="clearFilters" class="btn">クリア</button>
       <button id="exportCSV" class="btn">CSV出力</button>
     </div>
 
     <div class="card">
-      <table id="recordsTable" class="table">
+      <table id="recordsTable" class="table compact-table">
         <thead>
           <tr>
             <th>日付</th>
@@ -130,7 +150,7 @@
             <th>区分</th>
             <th>金額(JPY)</th>
             <th>外貨</th>
-            <th>相手先</th>
+            <th>その他の内容</th>
             <th>支払方法</th>
             <th>メモ</th>
             <th>添付</th>
@@ -145,31 +165,30 @@
   <!-- 集計 -->
   <section id="tab-agg" class="tab-panel">
     <div class="card">
-      <div class="row">
+      <div class="row gap-sm">
         <label>月次<input type="month" id="aggMonth" /></label>
         <label>年次<input type="number" id="aggYear" min="2000" max="2100" /></label>
         <button id="recalc" class="btn">再計算</button>
       </div>
 
-      <div class="grid grid-3">
+      <div class="grid grid-3 compact">
         <div class="summary-box"><div class="label">月次 収入</div><div id="mIncome" class="val">-</div></div>
         <div class="summary-box"><div class="label">月次 経費</div><div id="mExpense" class="val">-</div></div>
         <div class="summary-box"><div class="label">月次 収支</div><div id="mNet" class="val">-</div></div>
-
         <div class="summary-box"><div class="label">年次 収入</div><div id="yIncome" class="val">-</div></div>
         <div class="summary-box"><div class="label">年次 経費</div><div id="yExpense" class="val">-</div></div>
         <div class="summary-box"><div class="label">年次 収支</div><div id="yNet" class="val">-</div></div>
       </div>
 
       <h3>月別内訳</h3>
-      <table id="monthlySummary" class="table">
+      <table id="monthlySummary" class="table compact-table">
         <thead><tr><th>月</th><th>収入</th><th>経費</th><th>収支</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
   </section>
 
-  <!-- プレビュー用ダイアログ -->
+  <!-- プレビュー -->
   <dialog id="previewModal" class="modal">
     <div class="modal-head">
       <strong>プレビュー</strong>
@@ -178,11 +197,10 @@
     <div id="previewContainer" class="preview"></div>
   </dialog>
 
-  <!-- Google API（順序はこのまま） -->
+  <!-- Google API -->
   <script async defer src="https://apis.google.com/js/api.js"></script>
   <script async defer src="https://accounts.google.com/gsi/client"></script>
 
-  <!-- アプリ本体 -->
   <script src="script.js"></script>
 </body>
 </html>
