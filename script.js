@@ -1,3 +1,6 @@
+// 外部 onload で先にダミーが動いた場合に追随して初期化を完了させる
+if (window._gapiReady && typeof window.gapiLoaded === "function") window.gapiLoaded();
+if (window._gisReady  && typeof window.gisLoaded  === "function") window.gisLoaded();
 /***** Google Drive 連携（堅牢） *****/
 const CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com"; // ←あなたのクライアントID
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
@@ -341,3 +344,4 @@ document.querySelectorAll(".tab").forEach(btn=>{
 /* ====== 初期描画 ====== */
 renderTable();
 recalcSummary();
+
