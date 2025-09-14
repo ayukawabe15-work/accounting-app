@@ -11,8 +11,9 @@
     <div class="container head-inner">
       <h1 class="logo">会計アプリ</h1>
       <div class="auth">
-        <button id="loginButton" class="btn btn-outline">Googleにログイン</button>
-        <span id="loginStatus" class="muted">未ログイン</span>
+      <!-- 右上：ログイン -->
+      <button id="loginButton" class="login-btn">Googleにログイン</button>
+      <span id="loginStatus">未ログイン</span>
       </div>
     </div>
   </header>
@@ -44,15 +45,29 @@
             </select>
           </div>
 
-          <div class="field">
-            <label for="category">使い道</label>
-            <input type="text" id="category" class="control" placeholder="例：スクリプト購入 / サーバー代" />
-          </div>
+          <!-- 使い道：プリセット + 自由入力 -->
+<div class="field">
+  <label>使い道</label>
+  <div class="combo">
+    <select id="categorySelect" class="w100">
+      <!-- JSで自動挿入 -->
+    </select>
+    <input id="categoryFree" type="text" class="w100" placeholder="例：スクリプト購入 / サーバー代">
+  </div>
+  <small class="hint">プリセットを選ぶか、自由入力に直接記入できます</small>
+</div>
 
-          <div class="field">
-            <label for="partner">取引先</label>
-            <input type="text" id="partner" class="control" placeholder="例：Tebex / VibeGAMES / FANBOX など" />
-          </div>
+          <!-- 取引先：プリセット + 自由入力 -->
+<div class="field">
+  <label>取引先</label>
+  <div class="combo">
+    <select id="partnerSelect" class="w100">
+      <!-- JSで自動挿入 -->
+    </select>
+    <input id="partnerFree" type="text" class="w100" placeholder="例：Tebex / VibeGAMES / FANBOX など">
+  </div>
+  <small class="hint">プリセットを選ぶか、自由入力に直接記入できます</small>
+</div>
 
           <div class="field">
             <label for="payment">支払方法</label>
@@ -159,3 +174,4 @@
 <script src="script.js"></script>
 </body>
 </html>
+
