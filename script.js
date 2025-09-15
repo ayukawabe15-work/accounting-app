@@ -272,6 +272,13 @@ function renderTable(){
     const fxStr = (rec.amountFx && rec.currency) ? `${rec.amountFx} ${rec.currency}` : "";
     const vendorStr = rec.vendor || "";
 
+    // ★ プレビュー用URLは「ID」から作る（/preview）
+    const fileId   = rec.file?.id || null;
+    const pvAnchor = fileId
+      ? `<a href="#" data-preview-id="${fileId}">プレビュー</a>`
+      // 旧データ互換：id が無いが webViewLink がある場合は新しいタブで開く
+      : (rec.file?.webViewLink ? `<a href="${rec.file.webViewLink}" target="_blank" rel="noopener">開く</a>` : "");
+
     tr.innerHTML = `
       <td>${rec.date||""}</td>
       <td>${rec.category||""}</td>
@@ -281,7 +288,7 @@ function renderTable(){
       <td>${rec.method||""}</td>
       <td>${vendorStr}</td>
       <td>${rec.memo||""}</td>
-      <td>${rec.file && rec.file.webViewLink ? `<a href="#" data-preview="${rec.file.webViewLink}">プレビュー</a>` : ""}</td>
+      <td>${pvAnchor}</td>
       <td><button class="btn btn-danger" data-del="${rec.id}">削除</button></td>
     `;
     tableBody.appendChild(tr);
@@ -298,13 +305,27 @@ function renderTable(){
     });
   });
 
-  // プレビュー
+  // ★ プレビュー（/preview を iframe で開く）
+  tableBody.querySelectorAll('a[data-preview-id]').forEach(a=>{
+    a.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      const id = a.dataset.previewId;
+      // 画像/PDF/Office などは /preview で埋め込み可
+      const url = `https://drive.google.com/file/d/${id}/preview`;
+      previewContainer.innerHTML = `
+        <iframe src="${url}" allow="autoplay" style="width:100%;height:100%;border:0"></iframe>
+      `;
+      previewModal.showModal();
+    });
+  });
+
+  // 互換：旧 data-preview（webViewLink直埋め）にバインドが残っていた場合の処理
   tableBody.querySelectorAll('a[data-preview]').forEach(a=>{
     a.addEventListener('click', (ev)=>{
       ev.preventDefault();
       const url = a.dataset.preview;
-      previewContainer.innerHTML = `<iframe src="${url}"></iframe>`;
-      previewModal.showModal();
+      // webViewLink は埋め込みできないことがあるので新しいタブで開く
+      window.open(url, '_blank', 'noopener');
     });
   });
 }
@@ -385,3 +406,4 @@ recalcBtn.addEventListener('click', recalcAll);
 /***** 初期化 *****/
 renderTable();
 recalcAll();
+
