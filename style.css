@@ -43,7 +43,3 @@ input[type="file"]{padding:.35rem .6rem}
 .modal-head{display:flex;justify-content:space-between;align-items:center;padding:.6rem 1rem;border-bottom:1px solid var(--line)}
 .preview{padding:0;height:calc(100% - 46px)}
 .preview iframe{border:0;width:100%;height:100%}
-
-/* 取引先の選択＋自由入力を横並びにしやすくする補助 */
-.vendor-row{display:flex;gap:.5rem;align-items:center}
-.vendor-row > *{flex:1}
