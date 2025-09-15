@@ -215,16 +215,63 @@ form.addEventListener('submit', async (e)=>{
     memo: memoEl.value || "",
     file: null // {id,name,mimeType,webViewLink}
   };
+  const rec = {
+    id: crypto.randomUUID(),
+    date,
+    category: finalCategory,
+    type,
+    amount: amountJPY,
+    currency,
+    amountFx: (currency === "JPY" ? 0 : amountFx),
+    fxRate:  (currency === "JPY" ? 1 : fxRate),
+    method,
+    memo,
+    fileName, 
+    fileUrl,     // ← 既存：viewリンク
+    fileId,      // ← 既存：削除時に使用
+    previewUrl: (typeof _previewUrl !== "undefined" ? _previewUrl : "") // ← 追加：埋め込み用
+  };
 
-  // 添付アップロード
-  const file = fileInput.files?.[0];
-  if (file){
-    try{
-      const uploaded = await uploadToDrive(file);
-      record.file = uploaded;
-    }catch(err){
+  // ファイルアップロード
+  let fileName = "", fileUrl = "", fileId = "";
+  if (fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    try {
+      const accessToken = gapi.client.getToken()?.access_token;
+      if (!accessToken) { alert("先に『Googleにログイン』してください"); return; }
+
+      const metadata = { name: file.name, mimeType: file.type };
+      const fd = new FormData();
+      fd.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+      fd.append("file", file);
+
+      // 1) アップロード（idのみ受け取る）
+      const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+        method: "POST",
+        headers: new Headers({ Authorization: "Bearer " + accessToken }),
+        body: fd
+      });
+      const data = await res.json();
+      if (!data.id) throw new Error("Google Driveへのアップロードに失敗");
+      fileId = data.id;
+      fileName = file.name;
+
+      // 2) 共有権限を anyone:reader に変更
+      await makeFilePublic(fileId);
+
+      // 3) URLをプレビュー用と表示用の両方で保持
+      fileUrl = driveViewUrl(fileId);             // 新規タブで開く用
+      const previewUrl = drivePreviewUrl(fileId); // iframeプレビュー用
+
+      // 後で使うために両方持っておく（既存構造に合わせるなら fileUrl に view を入れてOK）
+      // ここではレコード保存時に previewUrl を r.previewUrl として追加します↓
+      var _previewUrl = previewUrl;
+
+      // ↓ この下の rec オブジェクトを作る所で _previewUrl を使います
+    } catch (err) {
       console.error(err);
-      alert("ファイルのアップロードに失敗しました。ファイルなしで記録します。");
+      alert("ファイルのアップロードに失敗しました。もう一度お試しください。");
+      return;
     }
   }
 
@@ -264,70 +311,65 @@ function matchFilters(rec){
 }
 
 function renderTable(){
-  const list = loadRecords();
   tableBody.innerHTML = "";
+  const rows = records.filter(passesFilters).sort((a,b)=>a.date.localeCompare(b.date));
+  for(const r of rows){
+    const tr = document.createElement("tr");
+    const fxCell = (r.currency && r.currency!=="JPY")
+      ? `${r.currency} ${Number(r.amountFx).toLocaleString(undefined,{maximumFractionDigits:4})} @ ${Number(r.fxRate).toLocaleString(undefined,{maximumFractionDigits:6})}`
+      : "";
 
-  list.filter(matchFilters).forEach(rec=>{
-    const tr = document.createElement('tr');
-    const fxStr = (rec.amountFx && rec.currency) ? `${rec.amountFx} ${rec.currency}` : "";
-    const vendorStr = rec.vendor || "";
-
-    // ★ プレビュー用URLは「ID」から作る（/preview）
-    const fileId   = rec.file?.id || null;
-    const pvAnchor = fileId
-      ? `<a href="#" data-preview-id="${fileId}">プレビュー</a>`
-      // 旧データ互換：id が無いが webViewLink がある場合は新しいタブで開く
-      : (rec.file?.webViewLink ? `<a href="${rec.file.webViewLink}" target="_blank" rel="noopener">開く</a>` : "");
+    const previewLink = r.previewUrl || (r.fileId ? drivePreviewUrl(r.fileId) : "");
+    const linkHtml = r.fileUrl 
+      ? `<a href="${r.fileUrl}" target="_blank" data-preview="${previewLink}" data-name="${r.fileName}" class="preview-link">${r.fileName || "開く"}</a>`
+      : "";
 
     tr.innerHTML = `
-      <td>${rec.date||""}</td>
-      <td>${rec.category||""}</td>
-      <td>${rec.sectionType||""}</td>
-      <td style="text-align:right">${fmt(rec.amount)}</td>
-      <td>${fxStr}</td>
-      <td>${rec.method||""}</td>
-      <td>${vendorStr}</td>
-      <td>${rec.memo||""}</td>
-      <td>${pvAnchor}</td>
-      <td><button class="btn btn-danger" data-del="${rec.id}">削除</button></td>
+      <td>${r.date}</td>
+      <td>${r.category}</td>
+      <td>${r.type}</td>
+      <td>${Number(r.amount||0).toLocaleString()}</td>
+      <td>${fxCell}</td>
+      <td>${r.method||""}</td>
+      <td>${r.memo||""}</td>
+      <td>${linkHtml}</td>
+      <td><button class="btn-danger delete-btn" data-id="${r.id}">削除</button></td>
     `;
     tableBody.appendChild(tr);
+  }
+  bindPreviewLinks();
+}
+// Drive: ファイルを「リンクを知っている全員が閲覧可」にする
+async function makeFilePublic(fileId) {
+  const token = gapi.client.getToken()?.access_token;
+  if (!token) throw new Error("No access token");
+
+  // 権限付与（anyone, reader）
+  const permRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`, {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      role: "reader",
+      type: "anyone"
+    })
   });
 
-  // 削除
-  tableBody.querySelectorAll('button[data-del]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const id = btn.dataset.del;
-      const arr = loadRecords().filter(r=>r.id!==id);
-      saveRecords(arr);
-      renderTable();
-      recalcAll();
-    });
-  });
+  if (!permRes.ok) {
+    const t = await permRes.text().catch(() => "");
+    throw new Error("Set permission failed: " + t);
+  }
+}
 
-  // ★ プレビュー（/preview を iframe で開く）
-  tableBody.querySelectorAll('a[data-preview-id]').forEach(a=>{
-    a.addEventListener('click', (ev)=>{
-      ev.preventDefault();
-      const id = a.dataset.previewId;
-      // 画像/PDF/Office などは /preview で埋め込み可
-      const url = `https://drive.google.com/file/d/${id}/preview`;
-      previewContainer.innerHTML = `
-        <iframe src="${url}" allow="autoplay" style="width:100%;height:100%;border:0"></iframe>
-      `;
-      previewModal.showModal();
-    });
-  });
-
-  // 互換：旧 data-preview（webViewLink直埋め）にバインドが残っていた場合の処理
-  tableBody.querySelectorAll('a[data-preview]').forEach(a=>{
-    a.addEventListener('click', (ev)=>{
-      ev.preventDefault();
-      const url = a.dataset.preview;
-      // webViewLink は埋め込みできないことがあるので新しいタブで開く
-      window.open(url, '_blank', 'noopener');
-    });
-  });
+// Drive: 埋め込み用のプレビューURL（iframe向け）
+function drivePreviewUrl(fileId) {
+  return `https://drive.google.com/file/d/${fileId}/preview`;
+}
+// 新規タブでの閲覧URL（普通の共有リンク）
+function driveViewUrl(fileId) {
+  return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 }
 
 /***** フィルタ／CSV *****/
@@ -406,4 +448,5 @@ recalcBtn.addEventListener('click', recalcAll);
 /***** 初期化 *****/
 renderTable();
 recalcAll();
+
 
