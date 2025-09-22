@@ -210,4 +210,208 @@ form.addEventListener("submit", async (e) => {
     : "";
   const attachText = fileInputEl.files.length ? fileInputEl.files[0].name : "（なし）";
   const confirmMsg =
-    `この内容で${editin
+    `この内容で${editingId ? "更新" : "保存"}しますか？\n\n` +
+    `日付：${date}\n` +
+    `区分：${type}\n` +
+    `勘定科目：${category}\n` +
+    `取引先：${partner || "（なし）"}\n` +
+    `金額：${fmtNum(amountJPY)} JPY${fxText}\n` +
+    `支払方法：${method || "（未選択）"}\n` +
+    `メモ：${memo || "（なし）"}\n` +
+    `添付：${attachText}\n`;
+  if (!confirm(confirmMsg)) return;
+
+  // 添付ファイル（必要時のみアップロード）
+  let newFile = { fileName:"", fileUrl:"", fileId:"", previewUrl:"" };
+  if (fileInputEl.files.length > 0) {
+    const token = (gapi?.client?.getToken && gapi.client.getToken())?.access_token;
+    if (!token) {
+      const cont = confirm("Googleに未ログインのため、ファイルはDriveへアップロードされません。\nそのまま（添付なしで）保存しますか？");
+      if (!cont) return;
+    } else {
+      try {
+        const up = fileInputEl.files[0];
+        const meta = { name: up.name, mimeType: up.type || "application/octet-stream" };
+        const fd = new FormData();
+        fd.append("metadata", new Blob([JSON.stringify(meta)], { type: "application/json" }));
+        fd.append("file", up);
+
+        const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token },
+          body: fd
+        });
+        const data = await res.json();
+        if (!data.id) throw new Error("Driveアップロード失敗");
+        await makeFilePublic(data.id);
+
+        newFile.fileId = data.id;
+        newFile.fileName = up.name;
+        newFile.fileUrl = driveViewUrl(data.id);
+        newFile.previewUrl = drivePreviewUrl(data.id);
+      } catch (err) {
+        console.error(err);
+        alert("ファイルのアップロードに失敗しました。もう一度お試しください。");
+        return;
+      }
+    }
+  }
+
+  // 保存 or 更新
+  if (!editingId) {
+    const rec = {
+      id: crypto.randomUUID(),
+      date,
+      type,
+      category,
+      partner,
+      currency,
+      amount: currency === "JPY" ? amountJPY : Math.round(amountFx * fxRate),
+      amountFx: currency === "JPY" ? 0 : amountFx,
+      fxRate:  currency === "JPY" ? 1 : fxRate,
+      method,
+      memo,
+      fileName: newFile.fileName,
+      fileUrl: newFile.fileUrl,
+      fileId: newFile.fileId,
+      previewUrl: newFile.previewUrl
+    };
+    records.push(rec);
+  } else {
+    const idx = records.findIndex(r=>r.id===editingId);
+    if (idx === -1) { alert("対象レコードが見つかりませんでした。"); return; }
+
+    // 旧ファイル → 新ファイルで差し替え（新しい添付があるときだけ）
+    let { fileName, fileUrl, fileId, previewUrl } = records[idx];
+    if (newFile.fileId) {
+      if (fileId) {
+        const token = (gapi?.client?.getToken && gapi.client.getToken())?.access_token;
+        if (token) {
+          try {
+            await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+              method: "DELETE",
+              headers: { Authorization: "Bearer " + token }
+            });
+          } catch (_) {}
+        }
+      }
+      fileName = newFile.fileName;
+      fileUrl = newFile.fileUrl;
+      fileId = newFile.fileId;
+      previewUrl = newFile.previewUrl;
+    }
+
+    records[idx] = {
+      ...records[idx],
+      date,
+      type,
+      category,
+      partner,
+      currency,
+      amount: currency === "JPY" ? amountJPY : Math.round(amountFx * fxRate),
+      amountFx: currency === "JPY" ? 0 : amountFx,
+      fxRate:  currency === "JPY" ? 1 : fxRate,
+      method,
+      memo,
+      fileName,
+      fileUrl,
+      fileId,
+      previewUrl
+    };
+  }
+
+  saveRecords();
+  exitEditMode();
+  form.reset();
+  renderTable();
+  alert(editingId ? "更新しました！" : "登録しました！");
+});
+
+// 編集キャンセル
+cancelEditBtn.addEventListener("click", () => {
+  form.reset();
+  exitEditMode();
+});
+
+// ========== 初期値（日付=今日） ==========
+(function setToday(){
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const dd = String(d.getDate()).padStart(2,"0");
+  dateEl.value = `${yyyy}-${mm}-${dd}`;
+})();
+
+// ========== Google 認証まわり ==========
+const GOOGLE_CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com";
+const GOOGLE_API_KEY = "";
+const GOOGLE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+
+let tokenClient = null;
+
+// gapi（旧JSクライアント）のロード完了時に呼ばれる
+window.gapiLoaded = function () {
+  gapi.load("client", async () => {
+    try {
+      await gapi.client.init({
+        apiKey: GOOGLE_API_KEY,
+        discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+      });
+    } catch (_) {}
+    updateAuthState();
+  });
+};
+
+// GSI（新OAuth）のロード完了時に呼ばれる
+window.gisLoaded = function(){
+  if (!GOOGLE_CLIENT_ID) return;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: GOOGLE_SCOPE,
+    callback: (resp) => {
+      // 受け取ったアクセストークンを gapi にも反映
+      if (resp && resp.access_token && gapi?.client?.setToken) {
+        gapi.client.setToken({ access_token: resp.access_token });
+      }
+      updateAuthState();
+    }
+  });
+};
+
+// ログイン
+gLoginBtn.addEventListener("click", () => {
+  if (!tokenClient) {
+    alert("Googleログインの初期化に失敗しました。ページを再読込してから再度お試しください。");
+    return;
+  }
+  tokenClient.requestAccessToken({ prompt: "" }); // 初回に同意画面を出したい場合は "consent"
+});
+
+// ログアウト
+gLogoutBtn.addEventListener("click", () => {
+  const tokenObj = gapi?.client?.getToken && gapi.client.getToken();
+  const accessToken = tokenObj?.access_token;
+  if (accessToken && window.google?.accounts?.oauth2?.revoke) {
+    google.accounts.oauth2.revoke(accessToken, () => {});
+  }
+  if (gapi?.client?.setToken) {
+    gapi.client.setToken(null);
+  }
+  updateAuthState();
+});
+
+// 表示の更新
+function updateAuthState() {
+  const token = gapi?.client?.getToken && gapi.client.getToken();
+  if (token?.access_token) {
+    authStateEl.textContent = "ログイン中";
+    authStateEl.style.color = "var(--ok)";
+  } else {
+    authStateEl.textContent = "未ログイン";
+    authStateEl.style.color = "var(--muted)";
+  }
+}
+
+// ========== 起動時 ==========
+renderTable();
+updateAuthState();
