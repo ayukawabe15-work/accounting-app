@@ -345,7 +345,7 @@ cancelEditBtn.addEventListener("click", () => {
 
 // ========== Google 認証まわり（任意） ==========
 // クライアントID/スコープ（必要に応じて差し替え）
-const GOOGLE_CLIENT_ID = ""; // 使う場合はOAuthのクライアントIDを入れてください
+const GOOGLE_CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com"; // 使う場合はOAuthのクライアントIDを入れてください
 const GOOGLE_API_KEY = "";   // 不要でもOK
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive";
 
@@ -409,3 +409,4 @@ function updateAuthState(){
 // ========== 起動時 ==========
 renderTable();
 updateAuthState();
+
