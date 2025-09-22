@@ -32,20 +32,43 @@
           <input type="date" id="date" required />
         </label>
 
+        <!-- 収入 / 支出 -->
         <label>
-          使い道
+          区分
+          <select id="type" required>
+            <option value="収入">収入</option>
+            <option value="支出">支出</option>
+          </select>
+        </label>
+
+        <!-- 勘定科目（旧 使い道） -->
+        <label>
+          勘定科目
           <select id="category">
             <option value="スクリプト購入">スクリプト購入</option>
             <option value="サーバー代">サーバー代</option>
             <option value="機材購入">機材購入</option>
             <option value="雑費">雑費</option>
-            <option value="FANBOX支援（収益）">FANBOX支援（収益）</option>
+            <option value="FANBOX支援">FANBOX支援</option>
           </select>
         </label>
 
+        <!-- 取引先（選択式 + 自由入力） -->
         <label>
-          その他の内容（任意）
-          <input type="text" id="customCategory" placeholder="自由入力" />
+          取引先
+          <div class="row">
+            <select id="partnerSelect">
+              <option value="">未選択</option>
+              <option>Tebex</option>
+              <option>VibeGAMES</option>
+              <option>Ko-fi</option>
+              <option>Killstore</option>
+              <option>Etsy</option>
+              <option>FANBOX</option>
+              <option>ZAP HOSTING</option>
+            </select>
+            <input type="text" id="partnerCustom" placeholder="自由入力（未選択時はこちらに記入）" />
+          </div>
         </label>
 
         <label>
@@ -60,15 +83,15 @@
           </select>
         </label>
 
+        <!-- 通貨（指定の5種類に変更） -->
         <label>
           通貨
           <select id="currency">
-            <option value="JPY">JPY（日本円）</option>
+            <option value="JPY">JPY</option>
             <option value="USD">USD</option>
             <option value="EUR">EUR</option>
             <option value="GBP">GBP</option>
-            <option value="KRW">KRW</option>
-            <option value="CNY">CNY</option>
+            <option value="lb">lb</option>
           </select>
         </label>
 
@@ -113,14 +136,17 @@
       <label>年月
         <input type="month" id="filterMonth" />
       </label>
-      <label>使い道
+      <label>勘定科目
         <input type="text" id="filterCategory" placeholder="完全一致で絞り込み" />
+      </label>
+      <label>取引先
+        <input type="text" id="filterPartner" placeholder="完全一致で絞り込み" />
       </label>
       <label>支払方法
         <input type="text" id="filterMethod" placeholder="完全一致で絞り込み" />
       </label>
       <label>キーワード
-        <input type="text" id="filterText" placeholder="使い道/メモを検索" />
+        <input type="text" id="filterText" placeholder="勘定科目/メモを検索" />
       </label>
       <button id="clearFilters" class="btn">クリア</button>
       <button id="exportCSV" class="btn">CSV出力</button>
@@ -131,8 +157,9 @@
         <thead>
           <tr>
             <th>日付</th>
-            <th>使い道</th>
+            <th>勘定科目</th>
             <th>区分</th>
+            <th>取引先</th>
             <th>金額(JPY)</th>
             <th>外貨</th>
             <th>支払方法</th>
