@@ -1,235 +1,163 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>会計アプリ</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8" />
+  <title>シンプル会計（保存前確認＋編集対応）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="./style.css" rel="stylesheet" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="left">
-      <h1>会計アプリ</h1>
-    </div>
-    <div class="right">
-      <button id="loginButton" class="btn">Googleにログイン</button>
-      <span id="loginStatus">未ログイン</span>
+  <header class="app-header">
+    <h1>シンプル会計</h1>
+    <div class="auth">
+      <button id="gLogin" class="btn">Googleにログイン</button>
+      <button id="gLogout" class="btn btn-subtle">ログアウト</button>
+      <span id="authState" class="muted">未ログイン</span>
     </div>
   </header>
 
-  <nav class="tabs">
-    <button class="tab active" data-target="tab-input">入力</button>
-    <button class="tab" data-target="tab-list">一覧</button>
-    <button class="tab" data-target="tab-agg">集計</button>
-  </nav>
+  <main class="container">
+    <section class="card">
+      <h2>取引入力</h2>
+      <form id="entryForm" autocomplete="off">
+        <div class="grid">
+          <label class="field">
+            <span>日付 <b class="req">*</b></span>
+            <input type="date" id="date" required />
+          </label>
 
-  <!-- 入力 -->
-  <section id="tab-input" class="tab-panel active">
-    <form id="entryForm" class="card">
-      <div class="grid">
-        <label>
-          日付
-          <input type="date" id="date" required />
-        </label>
-
-        <!-- 収入 / 支出 -->
-        <label>
-          区分
-          <select id="type" required>
-            <option value="収入">収入</option>
-            <option value="支出">支出</option>
-          </select>
-        </label>
-
-        <!-- 勘定科目（旧 使い道） -->
-        <label>
-          勘定科目
-          <select id="category">
-            <option value="スクリプト購入">スクリプト購入</option>
-            <option value="サーバー代">サーバー代</option>
-            <option value="機材購入">機材購入</option>
-            <option value="雑費">雑費</option>
-            <option value="FANBOX支援">FANBOX支援</option>
-          </select>
-        </label>
-
-        <!-- 取引先（選択式 + 自由入力） -->
-        <label>
-          取引先
-          <div class="row">
-            <select id="partnerSelect">
-              <option value="">未選択</option>
-              <option>Tebex</option>
-              <option>VibeGAMES</option>
-              <option>Ko-fi</option>
-              <option>Killstore</option>
-              <option>Etsy</option>
-              <option>FANBOX</option>
-              <option>ZAP HOSTING</option>
+          <label class="field">
+            <span>区分 <b class="req">*</b></span>
+            <select id="type" required>
+              <option value="支出">支出</option>
+              <option value="収入">収入</option>
             </select>
-            <input type="text" id="partnerCustom" placeholder="自由入力（未選択時はこちらに記入）" />
-          </div>
-        </label>
+          </label>
 
-        <label>
-          支払方法
-          <select id="method">
-            <option value="">未選択</option>
-            <option>PayPal</option>
-            <option>PayPay</option>
-            <option>銀行振込</option>
-            <option>クレカ</option>
-            <option>現金</option>
-          </select>
-        </label>
+          <label class="field">
+            <span>勘定科目 <b class="req">*</b></span>
+            <input id="category" list="categoryList" placeholder="例: 旅費交通費 / 広告宣伝費 / 売上高 など" required />
+            <datalist id="categoryList">
+              <option value="売上高"></option>
+              <option value="雑収入"></option>
+              <option value="旅費交通費"></option>
+              <option value="通信費"></option>
+              <option value="消耗品費"></option>
+              <option value="外注費"></option>
+              <option value="サーバー代"></option>
+              <option value="スクリプト購入"></option>
+            </datalist>
+          </label>
 
-        <!-- 通貨（指定の5種類に変更） -->
-        <label>
-          通貨
-          <select id="currency">
-            <option value="JPY">JPY</option>
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="GBP">GBP</option>
-            <option value="lb">lb</option>
-          </select>
-        </label>
+          <label class="field">
+            <span>取引先（選択）</span>
+            <select id="partnerSelect">
+              <option value="">— 選択しない —</option>
+              <option value="Tebex">Tebex</option>
+              <option value="VibeGAMES">VibeGAMES</option>
+              <option value="Ko-fi">Ko-fi</option>
+              <option value="Killstore">Killstore</option>
+              <option value="Etsy">Etsy</option>
+              <option value="FANBOX">FANBOX</option>
+              <option value="ZAP HOSTING">ZAP HOSTING</option>
+            </select>
+          </label>
 
-        <label>
-          外貨金額
-          <input type="number" id="amountFx" step="0.0001" placeholder="例: 12.34" />
-        </label>
+          <label class="field">
+            <span>取引先（自由入力）</span>
+            <input id="partnerCustom" placeholder="選択にない場合はこちらへ記入" />
+          </label>
 
-        <label>
-          為替レート
-          <div class="row">
-            <input type="number" id="fxRate" step="0.000001" placeholder="1USD=???JPY" />
-            <button type="button" id="autoRateBtn" class="btn" onclick="fetchFxRate()">自動取得</button>
-          </div>
-        </label>
+          <label class="field">
+            <span>通貨 <b class="req">*</b></span>
+            <select id="currency">
+              <option value="JPY">JPY</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="LBP">LB（レバノン・ポンド想定）</option>
+            </select>
+          </label>
 
-        <label>
-          金額（円）
-          <input type="number" id="amount" step="1" placeholder="自動換算または直接入力" />
-        </label>
+          <label class="field">
+            <span>金額（円・JPYの場合はこちら）</span>
+            <input id="amount" type="number" min="0" step="1" inputmode="numeric" placeholder="例: 1200" />
+          </label>
 
-        <label class="col-2">
-          メモ
-          <input type="text" id="memo" placeholder="例：MLO/車MOD/サーバー更新など" />
-        </label>
+          <label class="field">
+            <span>外貨金額</span>
+            <input id="amountFx" type="number" min="0" step="0.01" inputmode="decimal" placeholder="例: 10.00" />
+          </label>
 
-        <label class="col-2">
-          ファイル添付（画像/PDF）
-          <input type="file" id="fileInput" accept="image/*,.pdf" />
-        </label>
+          <label class="field">
+            <span>為替レート</span>
+            <input id="fxRate" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="例: 156.2345" />
+          </label>
+
+          <label class="field">
+            <span>支払方法</span>
+            <input id="method" list="methodList" placeholder="例: PayPal / PayPay / 銀行振込 / 現金" />
+            <datalist id="methodList">
+              <option value="PayPal"></option>
+              <option value="PayPay"></option>
+              <option value="銀行振込"></option>
+              <option value="クレジットカード"></option>
+              <option value="現金"></option>
+            </datalist>
+          </label>
+
+          <label class="field span2">
+            <span>メモ</span>
+            <input id="memo" placeholder="任意のメモ" />
+          </label>
+
+          <label class="field span2">
+            <span>添付（領収書・画面キャプチャ等）</span>
+            <input id="fileInput" type="file" />
+            <small class="muted">ログイン済みなら Drive に自動アップロード／未ログインでも保存可（添付は後で編集で追加できます）</small>
+          </label>
+        </div>
+
+        <div class="actions">
+          <input type="hidden" id="editingId" />
+          <button type="submit" id="saveBtn" class="btn btn-primary">保存（Driveへ自動アップロード）</button>
+          <button type="button" id="cancelEdit" class="btn btn-subtle" style="display:none;">編集をキャンセル</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>一覧</h2>
+      <div class="table-wrap">
+        <table id="recordsTable">
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>勘定科目</th>
+              <th>区分</th>
+              <th>取引先</th>
+              <th>金額(JPY)</th>
+              <th>外貨</th>
+              <th>支払方法</th>
+              <th>メモ</th>
+              <th>添付</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="recordsTbody"></tbody>
+        </table>
       </div>
+    </section>
+  </main>
 
-      <div class="actions">
-        <button type="submit" class="btn btn-primary">保存（Driveへ自動アップロード）</button>
-      </div>
-    </form>
-  </section>
+  <footer class="footer">
+    <small class="muted">© Turtle City / Simple Ledger</small>
+  </footer>
 
-  <!-- 一覧 -->
-  <section id="tab-list" class="tab-panel">
-    <div class="card filters">
-      <label>年月
-        <input type="month" id="filterMonth" />
-      </label>
-      <label>勘定科目
-        <input type="text" id="filterCategory" placeholder="完全一致で絞り込み" />
-      </label>
-      <label>取引先
-        <input type="text" id="filterPartner" placeholder="完全一致で絞り込み" />
-      </label>
-      <label>支払方法
-        <input type="text" id="filterMethod" placeholder="完全一致で絞り込み" />
-      </label>
-      <label>キーワード
-        <input type="text" id="filterText" placeholder="勘定科目/メモを検索" />
-      </label>
-      <button id="clearFilters" class="btn">クリア</button>
-      <button id="exportCSV" class="btn">CSV出力</button>
-    </div>
+  <!-- Google API（必要な方のみ）: 有効でなくてもアプリは動作します -->
+  <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    <div class="card">
-      <table id="recordsTable" class="table">
-        <thead>
-          <tr>
-            <th>日付</th>
-            <th>勘定科目</th>
-            <th>区分</th>
-            <th>取引先</th>
-            <th>金額(JPY)</th>
-            <th>外貨</th>
-            <th>支払方法</th>
-            <th>メモ</th>
-            <th>添付</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- 集計 -->
-  <section id="tab-agg" class="tab-panel">
-    <div class="card">
-      <div class="row">
-        <label>月次
-          <input type="month" id="aggMonth" />
-        </label>
-        <label>年次
-          <input type="number" id="aggYear" min="2000" max="2100" />
-        </label>
-        <button id="recalc" class="btn">再計算</button>
-      </div>
-
-      <div class="grid grid-3">
-        <div class="summary-box">
-          <div class="label">月次 収入</div><div id="mIncome" class="val">-</div>
-        </div>
-        <div class="summary-box">
-          <div class="label">月次 経費</div><div id="mExpense" class="val">-</div>
-        </div>
-        <div class="summary-box">
-          <div class="label">月次 収支</div><div id="mNet" class="val">-</div>
-        </div>
-
-        <div class="summary-box">
-          <div class="label">年次 収入</div><div id="yIncome" class="val">-</div>
-        </div>
-        <div class="summary-box">
-          <div class="label">年次 経費</div><div id="yExpense" class="val">-</div>
-        </div>
-        <div class="summary-box">
-          <div class="label">年次 収支</div><div id="yNet" class="val">-</div>
-        </div>
-      </div>
-
-      <h3>月別内訳</h3>
-      <table id="monthlySummary" class="table">
-        <thead><tr><th>月</th><th>収入</th><th>経費</th><th>収支</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- プレビュー用ダイアログ -->
-  <dialog id="previewModal" class="modal">
-    <div class="modal-head">
-      <strong>プレビュー</strong>
-      <button id="closePreview" class="btn">閉じる</button>
-    </div>
-    <div id="previewContainer" class="preview"></div>
-  </dialog>
-
-  <!-- Google API（順序はこのまま） -->
-  <script async defer src="https://apis.google.com/js/api.js"></script>
-  <script async defer src="https://accounts.google.com/gsi/client"></script>
-
-  <!-- アプリ本体 -->
-  <script src="script.js"></script>
+  <script src="./script.js"></script>
 </body>
 </html>
