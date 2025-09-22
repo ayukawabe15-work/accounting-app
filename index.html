@@ -154,11 +154,14 @@
     <small class="muted">© Turtle City / Simple Ledger</small>
   </footer>
 
-  <!-- Google API（必要な方のみ）: 有効でなくてもアプリは動作します -->
-  <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer onload></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- gapi の読み込み: ?onload=gapiLoaded を残す -->
+<script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
 
-  <script src="./script.js"></script>
+<!-- GSI クライアントの読み込み: onload="gisLoaded()" を必ずつける -->
+<script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
+
+<script src="./script.js"></script>
 </body>
 </html>
+
 
