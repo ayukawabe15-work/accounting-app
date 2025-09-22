@@ -345,68 +345,65 @@ cancelEditBtn.addEventListener("click", () => {
 
 // ========== Google 認証まわり（任意） ==========
 // クライアントID/スコープ（必要に応じて差し替え）
-const GOOGLE_CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com"; // 使う場合はOAuthのクライアントIDを入れてください
-const GOOGLE_API_KEY = "";   // 不要でもOK
+const GOOGLE_CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com";
+const GOOGLE_API_KEY = "";
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive";
 
 let tokenClient = null;
 let gapiInited = false;
-let gisInited = false;
 
-window.gapiLoaded = function(){
-  gapi.load("client", async ()=>{
+window.gapiLoaded = function () {
+  gapi.load("client", async () => {
     gapiInited = true;
-    try{
-      await gapi.client.init({ apiKey: GOOGLE_API_KEY, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"] });
-    } catch(e){ /* noop */ }
-    maybeEnableButtons();
+    try {
+      await gapi.client.init({
+        apiKey: GOOGLE_API_KEY,
+        discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+      });
+    } catch (_) {}
+    updateAuthState();
   });
 };
 
-window.gisLoaded = function(){
+window.gisLoaded = function () {
   if (!GOOGLE_CLIENT_ID) return;
+  // ★ ログイン成功時に gapi にトークンを渡す
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: GOOGLE_SCOPE,
-    callback: (resp)=>{ updateAuthState(); }
+    callback: (resp) => {
+      if (resp && resp.access_token && gapiInited) {
+        gapi.client.setToken({ access_token: resp.access_token }); // ← これが重要！
+      }
+      updateAuthState();
+    },
   });
-  gisInited = true;
-  maybeEnableButtons();
 };
 
-function maybeEnableButtons(){
-  // どのみちUIは表示する。ログイン押下時に未設定なら注意出す。
-}
-
+// ログイン
 gLoginBtn.addEventListener("click", () => {
-  // クライアントID未設定なら注意
-  if (!GOOGLE_CLIENT_ID) {
-    alert("Google連携を使う場合は script.js の GOOGLE_CLIENT_ID を設定してください。");
+  if (!tokenClient) {
+    alert("Googleログインの初期化に失敗しました。ページを再読込してから再度お試しください。");
     return;
   }
-
-  // まだGSIが読み込まれていない/初期化されていない場合のフォールバック初期化
-  try {
-    if (!tokenClient && window.google?.accounts?.oauth2) {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: GOOGLE_SCOPE,
-        callback: (resp) => { updateAuthState(); }
-      });
-    }
-  } catch (e) {
-    console.warn("GSI init error:", e);
-  }
-
-  // tokenClient があればアクセストークン要求、無ければエラー表示
-  if (tokenClient) {
-    tokenClient.requestAccessToken({ prompt: "" });
-  } else {
-    alert("Googleログインの初期化に失敗しました。ページを再読込してから再度お試しください。");
-  }
+  tokenClient.requestAccessToken({ prompt: "" }); // 初回 consent を出したい場合は "consent"
 });
 
-function updateAuthState(){
+// ★ ログアウト（未実装だったので追加）
+gLogoutBtn.addEventListener("click", () => {
+  const tokenObj = gapi?.client?.getToken && gapi.client.getToken();
+  const accessToken = tokenObj?.access_token;
+  if (accessToken && window.google?.accounts?.oauth2?.revoke) {
+    google.accounts.oauth2.revoke(accessToken, () => {});
+  }
+  if (gapi?.client?.setToken) {
+    gapi.client.setToken(null);
+  }
+  updateAuthState();
+});
+
+// 表示の更新
+function updateAuthState() {
   const token = gapi?.client?.getToken && gapi.client.getToken();
   if (token?.access_token) {
     authStateEl.textContent = "ログイン中";
