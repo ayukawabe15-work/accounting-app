@@ -365,20 +365,53 @@ window.gapiLoaded = function () {
   });
 };
 
-window.gisLoaded = function () {
+window.gisLoaded = function(){
   if (!GOOGLE_CLIENT_ID) return;
-  // ★ ログイン成功時に gapi にトークンを渡す
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: GOOGLE_SCOPE,
-    callback: (resp) => {
-      if (resp && resp.access_token && gapiInited) {
-        gapi.client.setToken({ access_token: resp.access_token }); // ← これが重要！
-      }
-      updateAuthState();
-    },
+-   callback: (resp)=>{ updateAuthState(); }
++   callback: (resp)=>{
++     if (resp && resp.access_token && gapi?.client?.setToken) {
++       gapi.client.setToken({ access_token: resp.access_token });
++     }
++     updateAuthState();
++   }
   });
+  gisInited = true;
+  maybeEnableButtons();
 };
+function maybeEnableButtons(){
+  // どのみちUIは表示する。ログイン押下時に未設定なら注意出す。
+}
+
+gLoginBtn.addEventListener("click", () => {
+  // クライアントID未設定なら注意
+  if (!GOOGLE_CLIENT_ID) {
+    alert("Google連携を使う場合は script.js の GOOGLE_CLIENT_ID を設定してください。");
+    return;
+  }
+
+  // まだGSIが読み込まれていない/初期化されていない場合のフォールバック初期化
+  try {
+    if (!tokenClient && window.google?.accounts?.oauth2) {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_SCOPE,
+        callback: (resp) => { updateAuthState(); }
+      });
+    }
+  } catch (e) {
+    console.warn("GSI init error:", e);
+  }
+
+  // tokenClient があればアクセストークン要求、無ければエラー表示
+  if (tokenClient) {
+    tokenClient.requestAccessToken({ prompt: "" });
+  } else {
+    alert("Googleログインの初期化に失敗しました。ページを再読込してから再度お試しください。");
+  }
+});
 
 // ログイン
 gLoginBtn.addEventListener("click", () => {
@@ -417,6 +450,7 @@ function updateAuthState() {
 // ========== 起動時 ==========
 renderTable();
 updateAuthState();
+
 
 
 
