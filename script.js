@@ -378,21 +378,32 @@ function maybeEnableButtons(){
   // どのみちUIは表示する。ログイン押下時に未設定なら注意出す。
 }
 
-gLoginBtn.addEventListener("click", ()=>{
+gLoginBtn.addEventListener("click", () => {
+  // クライアントID未設定なら注意
   if (!GOOGLE_CLIENT_ID) {
     alert("Google連携を使う場合は script.js の GOOGLE_CLIENT_ID を設定してください。");
     return;
   }
-  if (tokenClient) tokenClient.requestAccessToken({ prompt: "" });
-});
 
-gLogoutBtn.addEventListener("click", ()=>{
-  const token = gapi?.client?.getToken && gapi.client.getToken();
-  if (token) {
-    google.accounts.oauth2.revoke(token.access_token);
-    gapi.client.setToken(null);
+  // まだGSIが読み込まれていない/初期化されていない場合のフォールバック初期化
+  try {
+    if (!tokenClient && window.google?.accounts?.oauth2) {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: GOOGLE_SCOPE,
+        callback: (resp) => { updateAuthState(); }
+      });
+    }
+  } catch (e) {
+    console.warn("GSI init error:", e);
   }
-  updateAuthState();
+
+  // tokenClient があればアクセストークン要求、無ければエラー表示
+  if (tokenClient) {
+    tokenClient.requestAccessToken({ prompt: "" });
+  } else {
+    alert("Googleログインの初期化に失敗しました。ページを再読込してから再度お試しください。");
+  }
 });
 
 function updateAuthState(){
@@ -409,4 +420,5 @@ function updateAuthState(){
 // ========== 起動時 ==========
 renderTable();
 updateAuthState();
+
 
