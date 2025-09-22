@@ -196,8 +196,14 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const date = document.getElementById("date").value;
-  const category = document.getElementById("category").value;
-  const customCategory = document.getElementById("customCategory").value.trim();
+  const type = document.getElementById("type").value;        // 収入 / 支出（新規）
+  const category = document.getElementById("category").value; // 勘定科目（旧 使い道）
+
+  // 取引先（選択 or 自由入力）
+  const partnerSelect = document.getElementById("partnerSelect").value;
+  const partnerCustom = document.getElementById("partnerCustom").value.trim();
+  const partner = partnerCustom || partnerSelect;
+
   const method = document.getElementById("method").value;
 
   const currency = currencyEl.value || "JPY";
@@ -215,9 +221,6 @@ form.addEventListener("submit", async (e) => {
   }else{
     if(!amountFx || !fxRate){ alert("外貨金額とレートを入力してください（自動取得も可）"); return; }
   }
-
-  const finalCategory = (customCategory || category);
-  const type = (finalCategory.includes("収益") ? "収入" : "経費");
 
   // ファイルアップロード（任意）
   let fileName = "", fileUrl = "", fileId = "", previewUrl = "";
@@ -255,12 +258,13 @@ form.addEventListener("submit", async (e) => {
     }
   }
 
-  // ここが唯一の rec 定義（重複なし！）
+  // レコード定義（type と partner を追加）
   const rec = {
     id: crypto.randomUUID(),
     date,
-    category: finalCategory,
-    type,
+    category,        // 勘定科目
+    type,            // 収入/支出
+    partner,         // 取引先
     amount: amountJPY,
     currency,
     amountFx: (currency==="JPY" ? 0 : amountFx),
@@ -270,7 +274,7 @@ form.addEventListener("submit", async (e) => {
     fileName,
     fileUrl,
     fileId,
-    previewUrl // 追加：iframeプレビュー用
+    previewUrl
   };
 
   records.push(rec);
@@ -284,13 +288,14 @@ form.addEventListener("submit", async (e) => {
 /***** フィルタ & 一覧描画 *****/
 const filterMonth = document.getElementById("filterMonth");
 const filterCategory = document.getElementById("filterCategory");
+const filterPartner = document.getElementById("filterPartner");
 const filterMethod = document.getElementById("filterMethod");
 const filterText = document.getElementById("filterText");
 document.getElementById("clearFilters").onclick = ()=>{
-  filterMonth.value = ""; filterCategory.value=""; filterMethod.value=""; filterText.value="";
+  filterMonth.value = ""; filterCategory.value=""; filterPartner.value=""; filterMethod.value=""; filterText.value="";
   renderTable();
 };
-[filterMonth, filterCategory, filterMethod, filterText].forEach(el=>el.addEventListener("input", renderTable));
+[filterMonth, filterCategory, filterPartner, filterMethod, filterText].forEach(el=>el.addEventListener("input", renderTable));
 
 function passesFilters(r){
   if(filterMonth.value){
@@ -298,6 +303,7 @@ function passesFilters(r){
     if(!r.date?.startsWith(ym)) return false;
   }
   if(filterCategory.value && r.category!==filterCategory.value) return false;
+  if(filterPartner.value && (r.partner||"")!==filterPartner.value) return false;
   if(filterMethod.value && r.method!==filterMethod.value) return false;
   const q = filterText.value.trim();
   if(q){
@@ -324,6 +330,7 @@ function renderTable(){
       <td>${r.date}</td>
       <td>${r.category}</td>
       <td>${r.type}</td>
+      <td>${r.partner || ""}</td>
       <td>${Number(r.amount||0).toLocaleString()}</td>
       <td>${fxCell}</td>
       <td>${r.method||""}</td>
@@ -339,10 +346,10 @@ function renderTable(){
 /***** CSVエクスポート *****/
 document.getElementById("exportCSV").onclick = ()=>{
   const rows = records.filter(passesFilters).sort((a,b)=>a.date.localeCompare(b.date));
-  const header = ["ID","日付","使い道","区分","金額JPY","通貨","外貨金額","為替レート","支払方法","メモ","ファイル名","ファイルURL"];
+  const header = ["ID","日付","勘定科目","区分","取引先","金額JPY","通貨","外貨金額","為替レート","支払方法","メモ","ファイル名","ファイルURL"];
   const csv = [header.join(",")].concat(
     rows.map(r=>[
-      r.id, r.date, esc(r.category), r.type, r.amount,
+      r.id, r.date, esc(r.category), r.type, esc(r.partner||""), r.amount,
       r.currency||"JPY", r.amountFx||0, r.fxRate||1,
       esc(r.method||""), esc(r.memo||""), esc(r.fileName||""), r.fileUrl||""
     ].join(","))
@@ -369,7 +376,7 @@ function calcAggregates(){
   if(ym){
     const monthRecs = records.filter(r=>r.date?.startsWith(ym));
     const mIncome = sumByType(monthRecs,"収入");
-    const mExpense = sumByType(monthRecs,"経費");
+    const mExpense = sumByType(monthRecs,"支出");
     setText("mIncome", yen(mIncome));
     setText("mExpense", yen(mExpense));
     setText("mNet", yen(mIncome - mExpense));
@@ -381,7 +388,7 @@ function calcAggregates(){
   if(year){
     const yearRecs = records.filter(r=>r.date?.startsWith(year+"-"));
     const yIncome = sumByType(yearRecs,"収入");
-    const yExpense = sumByType(yearRecs,"経費");
+    const yExpense = sumByType(yearRecs,"支出");
     setText("yIncome", yen(yIncome));
     setText("yExpense", yen(yExpense));
     setText("yNet", yen(yIncome - yExpense));
@@ -392,7 +399,7 @@ function calcAggregates(){
       const mm = String(m).padStart(2,"0");
       const list = records.filter(r=>r.date?.startsWith(`${year}-${mm}`));
       const inc = sumByType(list,"収入");
-      const exp = sumByType(list,"経費");
+      const exp = sumByType(list,"支出");
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${m}月</td><td>${yen(inc)}</td><td>${yen(exp)}</td><td>${yen(inc-exp)}</td>`;
       tbody.appendChild(tr);
@@ -445,7 +452,8 @@ document.getElementById("recordsTable").addEventListener("click", async (e) => {
   const ok = confirm(
     `このレコードを削除しますか？\n\n` +
     `・日付：${rec.date}\n` +
-    `・使い道：${rec.category}\n` +
+    `・勘定科目：${rec.category}\n` +
+    `・区分：${rec.type}\n` +
     `・金額：${Number(rec.amount||0).toLocaleString()} JPY` +
     `${rec.currency && rec.currency !== "JPY" ? `（${rec.currency} ${rec.amountFx} @ ${rec.fxRate}）` : ""}\n\n` +
     `※添付があればDriveファイルも可能なら削除します。`
