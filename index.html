@@ -154,14 +154,11 @@
     <small class="muted">© Turtle City / Simple Ledger</small>
   </footer>
 
-<!-- gapi の読み込み: ?onload=gapiLoaded を残す -->
+<!-- 先に自分のスクリプトを読む（gisLoaded/gapiLoaded を定義） -->
+<script src="./script.js"></script>
+
+<!-- gapi は ?onload=gapiLoaded を使う。空の onload 属性は付けない -->
 <script src="https://apis.google.com/js/api.js?onload=gapiLoaded" async defer></script>
 
-<!-- GSI クライアントの読み込み: onload="gisLoaded()" を必ずつける -->
+<!-- GSI は onload で gisLoaded を呼ぶ -->
 <script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
-
-<script src="./script.js"></script>
-</body>
-</html>
-
-
