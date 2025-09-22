@@ -1,9 +1,10 @@
 /* =========================
-   シンプル会計（保存前確認＋編集）
+   シンプル会計（保存前確認＋編集＋currencyapi自動換算）
    - 保存前にconfirmで最終確認
    - 一覧→編集→更新（添付差し替え可）
-   - Googleにログイン済みならファイルをDriveへ自動アップロード（公開リンク化）
+   - Googleにログイン済みならDriveへ自動アップロード（公開リンク化）
    - 未ログインでも保存は可能（添付は後から編集で追加可）
+   - currencyapiで通貨≠JPY時の為替レートを自動取得し、外貨⇄円を双方向自動計算
 ========================= */
 
 // ========== DOM取得 ==========
@@ -35,6 +36,93 @@ const authStateEl = document.getElementById("authState");
 // ========== 状態 ==========
 let records = loadRecords();
 let editingId = null;
+
+// ========== 為替：currencyapi 設定 ==========
+const CURRENCYAPI_KEY = "cur_live_X8hUbLuHDTzYbSFbZO7awXs5vi4CzVNs45lfmWXS"; // ユーザー提供
+const CURRENCYAPI_BASE = "https://api.currencyapi.com/v3";
+
+/** 24時間キャッシュ（localStorage） */
+function getCachedRate(key) {
+  try {
+    const raw = localStorage.getItem("fxcache_v1_" + key);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || !obj.value || !obj.ts) return null;
+    const age = Date.now() - obj.ts;
+    if (age > 24 * 60 * 60 * 1000) return null;
+    return obj.value;
+  } catch {
+    return null;
+  }
+}
+function setCachedRate(key, value) {
+  try {
+    localStorage.setItem(
+      "fxcache_v1_" + key,
+      JSON.stringify({ value, ts: Date.now() })
+    );
+  } catch {}
+}
+
+/** 日付を YYYY-MM-DD に */
+function ymd(d) {
+  const dt = d ? new Date(d) : new Date();
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** currencyapiから base->JPY のレートを取得。履歴→失敗時は最新。 */
+async function fetchRateToJPY(baseCurrency, dateStr) {
+  if (!baseCurrency || baseCurrency === "JPY") return 1;
+
+  const key = `${baseCurrency}_JPY_${dateStr || "latest"}`;
+  const cached = getCachedRate(key);
+  if (cached) return cached;
+
+  const paramsHist = new URLSearchParams({
+    base_currency: baseCurrency,
+    currencies: "JPY",
+    date: dateStr || ymd(),
+    apikey: CURRENCYAPI_KEY,
+  });
+
+  // 1) 歴史レート
+  try {
+    const res = await fetch(`${CURRENCYAPI_BASE}/historical?${paramsHist.toString()}`);
+    if (!res.ok) throw new Error("historical not ok");
+    const json = await res.json();
+    const rate = json?.data?.JPY?.value;
+    if (rate && Number.isFinite(rate)) {
+      setCachedRate(key, rate);
+      return rate;
+    }
+  } catch (_) {
+    // fallthrough
+  }
+
+  // 2) 最新レート
+  try {
+    const paramsLatest = new URLSearchParams({
+      base_currency: baseCurrency,
+      currencies: "JPY",
+      apikey: CURRENCYAPI_KEY,
+    });
+    const res2 = await fetch(`${CURRENCYAPI_BASE}/latest?${paramsLatest.toString()}`);
+    if (!res2.ok) throw new Error("latest not ok");
+    const json2 = await res2.json();
+    const rate2 = json2?.data?.JPY?.value;
+    if (rate2 && Number.isFinite(rate2)) {
+      setCachedRate(`${baseCurrency}_JPY_latest`, rate2);
+      return rate2;
+    }
+  } catch (e) {
+    console.error("currencyapi error:", e);
+  }
+
+  throw new Error("為替レートの取得に失敗しました。");
+}
 
 // ========== ユーティリティ ==========
 function loadRecords() {
@@ -138,6 +226,12 @@ function startEdit(id) {
 
   saveBtn.textContent = "更新";
   cancelEditBtn.style.display = "";
+
+  ensureFxFieldsState();
+  if (currencyEl.value !== "JPY" && !fxRateEl.value) {
+    // レートが空なら日付に合わせて取得
+    updateRateAndAutoCalc().catch(()=>{});
+  }
 }
 
 function exitEditMode() {
@@ -178,6 +272,83 @@ document.getElementById("recordsTable").addEventListener("click", (e) => {
   }
 });
 
+// ========== 外貨↔円 自動計算（currencyapi連携） ==========
+let programmaticUpdate = false;
+
+function ensureFxFieldsState() {
+  const isJPY = (currencyEl.value === "JPY");
+  amountFxEl.disabled = isJPY;
+  fxRateEl.disabled = isJPY;
+  if (isJPY) {
+    amountFxEl.value = "";
+    fxRateEl.value = "";
+    amountEl.placeholder = "例: 1200";
+  } else {
+    amountEl.placeholder = "自動計算されます（外貨金額入力でも円入力でもOK）";
+  }
+}
+
+/** レート取得 → fxRateElに反映。可能なら両金額も自動計算 */
+async function updateRateAndAutoCalc() {
+  if (currencyEl.value === "JPY") return;
+
+  const base = currencyEl.value;
+  const dateStr = dateEl.value || ymd();
+  const rate = await fetchRateToJPY(base, dateStr); // base→JPY
+  programmaticUpdate = true;
+  fxRateEl.value = Number(rate).toFixed(6);
+  programmaticUpdate = false;
+
+  // 既にどちらか金額が入っていれば反対側を更新
+  const amtFx = parseFloat(amountFxEl.value);
+  const amtJpy = parseInt(amountEl.value || "0", 10);
+
+  if (amtFx && !Number.isNaN(amtFx)) {
+    programmaticUpdate = true;
+    amountEl.value = Math.round(amtFx * rate);
+    programmaticUpdate = false;
+  } else if (amtJpy && !Number.isNaN(amtJpy)) {
+    programmaticUpdate = true;
+    amountFxEl.value = (amtJpy / rate).toFixed(2);
+    programmaticUpdate = false;
+  }
+}
+
+// 通貨・日付が変わったらレート更新
+currencyEl.addEventListener("change", async () => {
+  ensureFxFieldsState();
+  if (currencyEl.value !== "JPY") {
+    try { await updateRateAndAutoCalc(); } catch(e){ alert("為替レートの取得に失敗しました。"); }
+  }
+});
+
+dateEl.addEventListener("change", async () => {
+  if (currencyEl.value !== "JPY") {
+    try { await updateRateAndAutoCalc(); } catch(e){ /* 後段でsubmit時にも再トライ */ }
+  }
+});
+
+// 入力相互更新（ループ防止フラグつき）
+amountFxEl.addEventListener("input", () => {
+  if (programmaticUpdate || currencyEl.value === "JPY") return;
+  const fx = parseFloat(amountFxEl.value);
+  const rate = parseFloat(fxRateEl.value);
+  if (!fx || !rate) return;
+  programmaticUpdate = true;
+  amountEl.value = Math.round(fx * rate);
+  programmaticUpdate = false;
+});
+
+amountEl.addEventListener("input", () => {
+  if (programmaticUpdate || currencyEl.value === "JPY") return;
+  const jpy = parseInt(amountEl.value || "0", 10);
+  const rate = parseFloat(fxRateEl.value);
+  if (!jpy || !rate) return;
+  programmaticUpdate = true;
+  amountFxEl.value = (jpy / rate).toFixed(2);
+  programmaticUpdate = false;
+});
+
 // ========== フォーム保存（確認→アップロード→保存/更新） ==========
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -189,19 +360,40 @@ form.addEventListener("submit", async (e) => {
   const partnerCustom = (partnerCustomEl.value || "").trim();
   const partner = partnerCustom || partnerSelect;
   const currency = currencyEl.value || "JPY";
-  const amountJPY = parseInt(amountEl.value || "0", 10);
-  const amountFx = parseFloat(amountFxEl.value || "0");
-  const fxRate   = parseFloat(fxRateEl.value || "0");
+  let amountJPY = parseInt(amountEl.value || "0", 10);
+  let amountFx = parseFloat(amountFxEl.value || "0");
+  let fxRate   = parseFloat(fxRateEl.value || "0");
   const method = methodEl.value;
   const memo = (memoEl.value || "").trim();
 
-  // 入力チェック
+  // 入力チェック（外貨時はどちらかの金額があればOK）
   if (!date) { alert("日付は必須です。"); return; }
   if (!category) { alert("勘定科目は必須です。"); return; }
+
   if (currency === "JPY") {
     if (!amountJPY) { alert("金額（円）を入力してください。"); return; }
   } else {
-    if (!amountFx || !fxRate) { alert("外貨金額と為替レートを入力してください。"); return; }
+    if (!fxRate || !Number.isFinite(fxRate)) {
+      try {
+        fxRate = await fetchRateToJPY(currency, date || ymd());
+        fxRateEl.value = Number(fxRate).toFixed(6);
+      } catch {
+        alert("為替レートの取得に失敗しました。");
+        return;
+      }
+    }
+    if (!amountFx && !amountJPY) {
+      alert("外貨または円のどちらかの金額を入力してください。");
+      return;
+    }
+    // 片方しかない場合は自動計算
+    if (!amountJPY && amountFx) {
+      amountJPY = Math.round(amountFx * fxRate);
+      amountEl.value = String(amountJPY);
+    } else if (!amountFx && amountJPY) {
+      amountFx = Number((amountJPY / fxRate).toFixed(2));
+      amountFxEl.value = String(amountFx);
+    }
   }
 
   // 確認メッセージ
@@ -266,7 +458,7 @@ form.addEventListener("submit", async (e) => {
       category,
       partner,
       currency,
-      amount: currency === "JPY" ? amountJPY : Math.round(amountFx * fxRate),
+      amount: amountJPY,
       amountFx: currency === "JPY" ? 0 : amountFx,
       fxRate:  currency === "JPY" ? 1 : fxRate,
       method,
@@ -284,16 +476,14 @@ form.addEventListener("submit", async (e) => {
     // 旧ファイル → 新ファイルで差し替え（新しい添付があるときだけ）
     let { fileName, fileUrl, fileId, previewUrl } = records[idx];
     if (newFile.fileId) {
-      if (fileId) {
-        const token = (gapi?.client?.getToken && gapi.client.getToken())?.access_token;
-        if (token) {
-          try {
-            await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
-              method: "DELETE",
-              headers: { Authorization: "Bearer " + token }
-            });
-          } catch (_) {}
-        }
+      const token = (gapi?.client?.getToken && gapi.client.getToken())?.access_token;
+      if (fileId && token) {
+        try {
+          await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+            method: "DELETE",
+            headers: { Authorization: "Bearer " + token }
+          });
+        } catch (_) {}
       }
       fileName = newFile.fileName;
       fileUrl = newFile.fileUrl;
@@ -308,7 +498,7 @@ form.addEventListener("submit", async (e) => {
       category,
       partner,
       currency,
-      amount: currency === "JPY" ? amountJPY : Math.round(amountFx * fxRate),
+      amount: amountJPY,
       amountFx: currency === "JPY" ? 0 : amountFx,
       fxRate:  currency === "JPY" ? 1 : fxRate,
       method,
@@ -323,6 +513,7 @@ form.addEventListener("submit", async (e) => {
   saveRecords();
   exitEditMode();
   form.reset();
+  ensureFxFieldsState();
   renderTable();
   alert(editingId ? "更新しました！" : "登録しました！");
 });
@@ -331,6 +522,7 @@ form.addEventListener("submit", async (e) => {
 cancelEditBtn.addEventListener("click", () => {
   form.reset();
   exitEditMode();
+  ensureFxFieldsState();
 });
 
 // ========== 初期値（日付=今日） ==========
@@ -341,6 +533,9 @@ cancelEditBtn.addEventListener("click", () => {
   const dd = String(d.getDate()).padStart(2,"0");
   dateEl.value = `${yyyy}-${mm}-${dd}`;
 })();
+
+// JPY/外貨に応じて入力状態を初期反映
+ensureFxFieldsState();
 
 // ========== Google 認証まわり ==========
 const GOOGLE_CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com";
