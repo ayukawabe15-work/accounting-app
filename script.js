@@ -347,7 +347,7 @@ cancelEditBtn.addEventListener("click", () => {
 // クライアントID/スコープ（必要に応じて差し替え）
 const GOOGLE_CLIENT_ID = "91348359952-pns9nlvg8tr82p6ht791c31gg5meh98q.apps.googleusercontent.com";
 const GOOGLE_API_KEY = "";
-const GOOGLE_SCOPE = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive";
+const GOOGLE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 let tokenClient = null;
 let gapiInited = false;
@@ -417,5 +417,6 @@ function updateAuthState() {
 // ========== 起動時 ==========
 renderTable();
 updateAuthState();
+
 
 
