@@ -32,15 +32,6 @@
           <input type="date" id="date" required />
         </label>
 
-        <!-- 区分（収入/支出） -->
-        <label>
-          区分
-          <select id="sectionType">
-            <option value="支出">支出</option>
-            <option value="収入">収入</option>
-          </select>
-        </label>
-
         <label>
           使い道
           <select id="category">
@@ -52,23 +43,9 @@
           </select>
         </label>
 
-        <!-- 取引先：プルダウン＋自由入力 -->
-        <label class="col-2">
-          取引先（選択または自由入力）
-          <div class="vendor-row">
-            <select id="vendorSelect">
-              <option value="">（選択しない）</option>
-              <option>Tebex</option>
-              <option>VibeGAMES</option>
-              <option>Ko-fi</option>
-              <option>Killstore</option>
-              <option>Etsy</option>
-              <option>FANBOX</option>
-              <option>ZAP HOSTING</option>
-              <option value="__free__">→ 自由入力</option>
-            </select>
-            <input type="text" id="vendorFree" placeholder="自由入力（任意）" />
-          </div>
+        <label>
+          その他の内容（任意）
+          <input type="text" id="customCategory" placeholder="自由入力" />
         </label>
 
         <label>
